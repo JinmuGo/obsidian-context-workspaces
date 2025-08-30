@@ -11,16 +11,16 @@ interface CreateElementOptions {
 type ObsidianElement = HTMLElement & Record<string, unknown>;
 
 export class Notice {
-	constructor(message: string, _timeout?: number) {
-		console.log(`Notice: ${message}`);
-	}
+	// Notice functionality for testing
 }
 
 // DOM 요소에 Obsidian 메서드 추가하는 헬퍼 함수
 function addObsidianMethods(element: HTMLElement): ObsidianElement {
 	const el = element as ObsidianElement;
 	el.empty = () => {
-		element.innerHTML = '';
+		while (element.firstChild) {
+			element.removeChild(element.firstChild);
+		}
 	};
 
 	el.addClass = (...classes: string[]) => {

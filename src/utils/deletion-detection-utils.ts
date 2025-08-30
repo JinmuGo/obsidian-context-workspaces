@@ -74,7 +74,9 @@ export function removeDeletedWorkspaces(
 			settings.spaceOrder.splice(orderIndex, 1);
 		}
 
-		console.log(`Removed deleted workspace from Context Workspaces: ${workspaceId}`);
+		if (process.env.NODE_ENV === 'development') {
+			console.log(`Removed deleted workspace from Context Workspaces: ${workspaceId}`);
+		}
 	}
 }
 
@@ -87,7 +89,9 @@ export function switchToFirstWorkspace(settings: ContextWorkspacesSettings): voi
 		const oldWorkspaceId = settings.currentSpaceId;
 		settings.currentSpaceId = firstSpaceId;
 
-		console.log(`Switched from deleted workspace ${oldWorkspaceId} to first workspace ${firstSpaceId}`);
+		if (process.env.NODE_ENV === 'development') {
+			console.log(`Switched from deleted workspace ${oldWorkspaceId} to first workspace ${firstSpaceId}`);
+		}
 	}
 }
 
@@ -107,7 +111,9 @@ export function handleWorkspaceDeletions(
 			switchToFirstWorkspace(settings);
 		}
 
-		console.log(`Handled ${detectionResult.deletedWorkspaces.length} deleted workspace(s)`);
+		if (process.env.NODE_ENV === 'development') {
+			console.log(`Handled ${detectionResult.deletedWorkspaces.length} deleted workspace(s)`);
+		}
 	}
 
 	return detectionResult;
@@ -140,7 +146,9 @@ export async function safeDeletionDetection(
 	settings: ContextWorkspacesSettings
 ): Promise<DeletionDetectionResult | null> {
 	if (deletionDetectionInProgress) {
-		console.log('Deletion detection already in progress, skipping...');
+		if (process.env.NODE_ENV === 'development') {
+			console.log('Deletion detection already in progress, skipping...');
+		}
 		return null;
 	}
 
@@ -149,7 +157,7 @@ export async function safeDeletionDetection(
 		// Changed to synchronous processing (removed unnecessary Promise/setTimeout)
 		const result = handleWorkspaceDeletions(app, settings);
 
-		if (result.deletedWorkspaces.length > 0) {
+		if (result.deletedWorkspaces.length > 0 && process.env.NODE_ENV === 'development') {
 			console.log(
 				`Detected and handled ${result.deletedWorkspaces.length} deleted workspace(s)`
 			);

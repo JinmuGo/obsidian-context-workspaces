@@ -5,7 +5,6 @@ import { needsDeletionDetection, safeDeletionDetection } from './utils/deletion-
 import {
 	applySpaceTheme,
 	backupThemeState,
-	clearThemeStateBackup,
 	createObsidianWorkspace,
 	deleteObsidianWorkspace,
 	getExistingWorkspaces,
@@ -120,6 +119,9 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		// Setup workspace load monitoring for auto-switching
 		setupWorkspaceLoadMonitoring(this.app, this);
 
+		// Backup original Obsidian theme on plugin load
+		backupThemeState(this.app);
+
 		// Apply current space theme on load
 		setTimeout(async () => {
 			try {
@@ -133,6 +135,13 @@ export default class ContextWorkspacesPlugin extends Plugin {
 	async onunload() {
 		// Save current state
 		await this.saveCurrentSpaceState();
+
+		// Restore original Obsidian theme before unloading
+		try {
+			await restoreThemeState(this.app);
+		} catch (error) {
+			console.error('Failed to restore original Obsidian theme on unload:', error);
+		}
 
 		// Clear timeouts
 		clearTimeout(this.layoutChangeTimeout);
@@ -201,11 +210,6 @@ export default class ContextWorkspacesPlugin extends Plugin {
 			// Save current space state
 			await this.saveCurrentSpaceState();
 
-			// Backup current theme state before switching
-			backupThemeState(this.app);
-
-
-
 			// Switch to new space
 			this.settings.currentSpaceId = spaceId;
 			await this.saveSettings();
@@ -217,7 +221,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 					await applySpaceTheme(this.app, space.theme, space.themeMode);
 				} catch (error) {
 					console.error('Failed to apply space theme:', error);
-					// If theme application fails, restore previous theme state
+					// If theme application fails, restore to original Obsidian theme
 					try {
 						await restoreThemeState(this.app);
 					} catch (restoreError) {
@@ -225,8 +229,12 @@ export default class ContextWorkspacesPlugin extends Plugin {
 					}
 				}
 			} else {
-				// If no theme is configured for this space, clear the backup
-				clearThemeStateBackup();
+				// If no theme is configured for this space, restore to original Obsidian theme
+				try {
+					await restoreThemeState(this.app);
+				} catch (restoreError) {
+					console.error('Failed to restore original theme:', restoreError);
+				}
 			}
 
 			// Load new space state
@@ -469,19 +477,23 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		const currentSpace = this.settings.spaces[this.settings.currentSpaceId];
 		if (currentSpace && (currentSpace.theme || currentSpace.themeMode)) {
 			try {
-				// Backup current theme state before applying
-				backupThemeState(this.app);
-				
 				await applySpaceTheme(this.app, currentSpace.theme, currentSpace.themeMode);
 			} catch (error) {
 				console.error('Failed to apply current space theme:', error);
-				// If theme application fails, restore previous theme state
+				// If theme application fails, restore to original Obsidian theme
 				try {
 					await restoreThemeState(this.app);
 				} catch (restoreError) {
 					console.error('Failed to restore theme state:', restoreError);
 				}
 				throw error;
+			}
+		} else {
+			// If no theme is configured for current space, restore to original Obsidian theme
+			try {
+				await restoreThemeState(this.app);
+			} catch (restoreError) {
+				console.error('Failed to restore original theme:', restoreError);
 			}
 		}
 	}
@@ -579,13 +591,10 @@ export default class ContextWorkspacesPlugin extends Plugin {
 					
 					// If we haven't seen this workspace recently, it might be a false positive
 					if (!workspaceLastSeen || (now - workspaceLastSeen) < 5000) {
-						console.log(`Workspace ${spaceId} appears to be deleted, but checking for false positive...`);
-						
 						// Double-check by trying to get the workspace again
 						try {
 							const workspaces = getWorkspacesPlugin(this.app);
 							if (workspaces?.instance?.workspaces?.[spaceId]) {
-								console.log(`Workspace ${spaceId} still exists, skipping deletion`);
 								continue;
 							}
 						} catch (error) {
@@ -620,7 +629,6 @@ export default class ContextWorkspacesPlugin extends Plugin {
 					try {
 						const workspaces = getWorkspacesPlugin(this.app);
 						if (workspaces?.instance?.workspaces?.[this.settings.currentSpaceId]) {
-							console.log('Current workspace still exists, aborting deletion');
 							return;
 						}
 					} catch (error) {
@@ -635,10 +643,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 					);
 				}
 
-				// For other workspace deletions, log but don't show notification to avoid spam
-				if (deletedWorkspaces.length > 1 || !currentWorkspaceDeleted) {
-					console.log(`Detected ${deletedWorkspaces.length} deleted workspaces:`, deletedWorkspaces);
-				}
+				// For other workspace deletions, don't show notification to avoid spam
 
 				// Remove from Context Workspaces
 				for (const workspaceId of deletedWorkspaces) {
@@ -726,7 +731,8 @@ export default class ContextWorkspacesPlugin extends Plugin {
 
 			// Performance measurement end
 			const endTime = performance.now();
-			if (hasChanges) {
+			// Only log performance in development mode
+			if (hasChanges && process.env.NODE_ENV === 'development') {
 				console.log(
 					`Workspace change handled in ${(endTime - startTime).toFixed(2)}ms`
 				);

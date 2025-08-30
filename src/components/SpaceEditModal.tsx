@@ -147,14 +147,14 @@ export const SpaceEditModal: React.FC<SpaceEditModalProps> = ({
 							workspace.trigger('css-change');
 						}
 						
-						// Force a CSS refresh by updating a CSS variable
-						document.body.style.setProperty('--theme-refresh', Date.now().toString());
-						
 						// Force Obsidian to refresh the theme
 						const event = new CustomEvent('theme-change', { detail: { theme: updatedSpace.theme, mode: updatedSpace.themeMode } });
 						document.dispatchEvent(event);
 						
-						console.log('Context Workspaces: Theme changes applied and UI refreshed');
+						// Only log in development mode
+						if (process.env.NODE_ENV === 'development') {
+							console.log('Context Workspaces: Theme changes applied and UI refreshed');
+						}
 					}, 100);
 				} catch (error) {
 					console.error('Failed to apply theme changes:', error);

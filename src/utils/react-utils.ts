@@ -78,46 +78,14 @@ export class ReactModalWrapper {
 		// Create modal container
 		this.modalContainer = document.createElement('div');
 		this.modalContainer.className = 'react-modal-container';
-		this.modalContainer.style.cssText = `
-			position: fixed;
-			top: 0;
-			left: 0;
-			width: 100%;
-			height: 100%;
-			z-index: 1000;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-		`;
 
 		// Create backdrop
 		this.backdrop = document.createElement('div');
 		this.backdrop.className = 'react-modal-backdrop';
-		this.backdrop.style.cssText = `
-			position: absolute;
-			top: 0;
-			left: 0;
-			width: 100%;
-			height: 100%;
-			background: rgba(0, 0, 0, 0.5);
-		`;
 
 		// Modal content container
 		const contentContainer = document.createElement('div');
 		contentContainer.className = 'react-modal-content';
-		contentContainer.style.cssText = `
-			position: relative;
-			z-index: 1001;
-			background: var(--background-primary);
-			border: 1px solid var(--background-modifier-border);
-			border-radius: 8px;
-			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-			max-width: 90vw;
-			max-height: 90vh;
-			overflow: auto;
-			padding: 20px;
-			width: auto;
-		`;
 
 		// Add to DOM
 		this.modalContainer.appendChild(this.backdrop);

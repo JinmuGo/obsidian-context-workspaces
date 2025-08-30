@@ -305,8 +305,6 @@ export async function setTheme(app: App, themeName: string): Promise<void> {
 					workspace.trigger('css-change');
 				}
 
-				// Force a CSS refresh
-				document.body.style.setProperty('--theme-refresh', Date.now().toString());
 				
 				// Force Obsidian to refresh the theme immediately
 				setTimeout(() => {
@@ -430,9 +428,6 @@ export async function setThemeMode(app: App, mode: ThemeMode): Promise<void> {
 			workspace.trigger('css-change');
 		}
 
-		// Force a CSS refresh
-		document.body.style.setProperty('--theme-refresh', Date.now().toString());
-
 		// Dispatch custom event for theme mode change
 		window.dispatchEvent(new CustomEvent('theme-mode-change', { detail: { mode } }));
 		
@@ -470,8 +465,8 @@ export async function applySpaceTheme(
 			let themeToApply: string;
 			
 			if (theme === '' || !theme.trim()) {
-				// "Use Obsidian theme" option selected - use current Obsidian theme
-				themeToApply = getCurrentTheme(app);
+				// "Use Obsidian theme" option selected - use original Obsidian theme
+				themeToApply = getOriginalObsidianTheme() || getCurrentTheme(app);
 			} else {
 				// Specific theme selected
 				themeToApply = theme.trim();
@@ -479,7 +474,8 @@ export async function applySpaceTheme(
 			
 			const currentTheme = getCurrentTheme(app);
 			if (currentTheme !== themeToApply) {
-				await setTheme(app, themeToApply);
+				// Apply theme without changing Obsidian's default theme setting
+				await setThemeTemporarily(app, themeToApply);
 				changes.push(`Theme: ${themeToApply}`);
 				hasChanges = true;
 			}
@@ -489,18 +485,140 @@ export async function applySpaceTheme(
 		if (themeMode) {
 			const currentMode = getCurrentThemeMode(app);
 			if (currentMode !== themeMode) {
-				await setThemeMode(app, themeMode);
+				// Apply theme mode without changing Obsidian's default theme mode setting
+				await setThemeModeTemporarily(app, themeMode);
 				changes.push(`Mode: ${themeMode}`);
 				hasChanges = true;
 			}
 		}
 
-		// Log changes for debugging
-		if (hasChanges) {
+		// Log changes for debugging (only in development mode)
+		if (hasChanges && process.env.NODE_ENV === 'development') {
 			console.log('Context Workspaces: Applied theme changes:', changes.join(', '));
 		}
 	} catch (error) {
 		console.error('Failed to apply space theme:', error);
+		throw error;
+	}
+}
+
+/**
+ * Set theme temporarily without changing Obsidian's default theme setting
+ */
+async function setThemeTemporarily(app: App, themeName: string): Promise<void> {
+	try {
+		// Method 1: Use customCss.setTheme if available (safest method)
+		// @ts-expect-error - Obsidian internal API access
+		const customCss = app.customCss;
+		if (customCss?.setTheme && typeof customCss.setTheme === 'function') {
+			customCss.setTheme(themeName);
+			return;
+		}
+
+		// Method 2: Use Obsidian's built-in theme switching if available
+		// @ts-expect-error - Obsidian internal API access
+		if (app.internalPlugins?.plugins?.theme?.instance?.setTheme) {
+			// @ts-expect-error - Obsidian internal API access
+			app.internalPlugins.plugins.theme.instance.setTheme(themeName);
+			return;
+		}
+
+		// Method 3: Apply theme without saving to config (temporary change)
+		if (customCss?.theme) {
+			customCss.theme = themeName;
+			
+			// Trigger theme change event without saving config
+			const workspace = app.workspace as { trigger?: (event: string) => void };
+			if (workspace.trigger) {
+				workspace.trigger('css-change');
+			}
+
+			// Force Obsidian to refresh the theme immediately
+			setTimeout(() => {
+				// Trigger additional events to ensure theme is applied
+				const event = new CustomEvent('theme-change', { detail: { theme: themeName } });
+				document.dispatchEvent(event);
+				
+				// Force a re-render of the workspace
+				if (workspace.trigger) {
+					workspace.trigger('resize');
+				}
+			}, 50);
+			return;
+		}
+
+		// Method 4: Fallback - try to reload the page theme
+		console.warn('Using fallback temporary theme setting method');
+		throw new Error('Unable to set theme temporarily - no supported method available');
+	} catch (error) {
+		console.error('Failed to set theme temporarily:', error);
+		throw error;
+	}
+}
+
+/**
+ * Set theme mode temporarily without changing Obsidian's default theme mode setting
+ */
+async function setThemeModeTemporarily(app: App, mode: ThemeMode): Promise<void> {
+	try {
+		const body = document.body;
+		const currentMode = getCurrentThemeMode(app);
+
+		// Only change if the mode is actually different
+		if (currentMode === mode) {
+			return;
+		}
+
+		// Use Obsidian's built-in theme mode switching if available
+		// @ts-expect-error - Obsidian internal API access
+		if (app.internalPlugins?.plugins?.theme?.instance?.setThemeMode) {
+			// @ts-expect-error - Obsidian internal API access
+			app.internalPlugins.plugins.theme.instance.setThemeMode(mode);
+			return;
+		}
+
+		// Fallback: Manual class manipulation without saving to config
+		if (mode === 'dark') {
+			body.classList.remove('theme-light');
+			body.classList.add('theme-dark');
+		} else if (mode === 'light') {
+			body.classList.remove('theme-dark');
+			body.classList.add('theme-light');
+		} else if (mode === 'system') {
+			// system mode - Remove both classes and apply system preference
+			body.classList.remove('theme-dark', 'theme-light');
+
+			// Apply system preference
+			const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+			if (isDarkMode) {
+				body.classList.add('theme-dark');
+			} else {
+				body.classList.add('theme-light');
+			}
+		}
+
+		// Trigger theme change events without saving config
+		const workspace = app.workspace as { trigger?: (event: string) => void };
+		if (workspace.trigger) {
+			workspace.trigger('css-change');
+		}
+
+		// Dispatch custom event for theme mode change
+		window.dispatchEvent(new CustomEvent('theme-mode-change', { detail: { mode } }));
+		
+		// Force Obsidian to refresh the theme mode immediately
+		setTimeout(() => {
+			// Trigger additional events to ensure theme mode is applied
+			const event = new CustomEvent('theme-change', { detail: { mode } });
+			document.dispatchEvent(event);
+			
+			// Force a re-render of the workspace
+			if (workspace.trigger) {
+				workspace.trigger('resize');
+			}
+		}, 50);
+	} catch (error) {
+		console.error('Failed to set theme mode temporarily:', error);
 		throw error;
 	}
 }
@@ -549,7 +667,9 @@ export function setupWorkspaceLoadMonitoring(app: App, plugin: ContextWorkspaces
 			}
 		};
 
-		console.log('Context Workspaces: Workspace load monitoring enabled');
+		if (process.env.NODE_ENV === 'development') {
+			console.log('Context Workspaces: Workspace load monitoring enabled');
+		}
 	} catch (error) {
 		console.error('Failed to setup workspace load monitoring:', error);
 	}
@@ -571,7 +691,9 @@ export function removeWorkspaceLoadMonitoring(app: App): void {
 			delete workspaces.instance._originalLoadWorkspace;
 		}
 
-		console.log('Context Workspaces: Workspace load monitoring disabled');
+		if (process.env.NODE_ENV === 'development') {
+			console.log('Context Workspaces: Workspace load monitoring disabled');
+		}
 	} catch (error) {
 		console.error('Failed to remove workspace load monitoring:', error);
 	}
@@ -581,54 +703,70 @@ export function removeWorkspaceLoadMonitoring(app: App): void {
  * Store for theme state backup
  */
 let themeStateBackup: ThemeStateBackup | null = null;
+let originalObsidianTheme: string | null = null;
+let originalObsidianThemeMode: ThemeMode | null = null;
 
 /**
- * Backup current theme state
+ * Backup current theme state and store original Obsidian theme
  */
 export function backupThemeState(app: App): void {
 	try {
+		// Store original Obsidian theme if not already stored
+		if (originalObsidianTheme === null) {
+			originalObsidianTheme = getCurrentTheme(app);
+		}
+		if (originalObsidianThemeMode === null) {
+			originalObsidianThemeMode = getCurrentThemeMode(app);
+		}
+
+		// Backup current state (which might be workspace-specific)
 		themeStateBackup = {
 			theme: getCurrentTheme(app),
 			themeMode: getCurrentThemeMode(app),
 		};
-		console.log('Context Workspaces: Theme state backed up:', themeStateBackup);
+		if (process.env.NODE_ENV === 'development') {
+			console.log('Context Workspaces: Theme state backed up:', themeStateBackup);
+			console.log('Context Workspaces: Original Obsidian theme:', originalObsidianTheme);
+		}
 	} catch (error) {
 		console.error('Failed to backup theme state:', error);
 	}
 }
 
 /**
- * Restore theme state from backup
+ * Restore theme state from backup (restore to original Obsidian theme, not workspace-specific theme)
  */
 export async function restoreThemeState(app: App): Promise<void> {
 	try {
-		if (!themeStateBackup) {
-			console.log('Context Workspaces: No theme state backup to restore');
+		if (!originalObsidianTheme && !originalObsidianThemeMode) {
+			if (process.env.NODE_ENV === 'development') {
+				console.log('Context Workspaces: No original Obsidian theme to restore');
+			}
 			return;
 		}
 
 		const changes: string[] = [];
 
-		// Restore theme if it was backed up
-		if (themeStateBackup.theme) {
+		// Restore to original Obsidian theme (not the backed up workspace-specific theme)
+		if (originalObsidianTheme) {
 			const currentTheme = getCurrentTheme(app);
-			if (currentTheme !== themeStateBackup.theme) {
-				await setTheme(app, themeStateBackup.theme);
-				changes.push(`Theme: ${themeStateBackup.theme}`);
+			if (currentTheme !== originalObsidianTheme) {
+				await setTheme(app, originalObsidianTheme);
+				changes.push(`Theme: ${originalObsidianTheme}`);
 			}
 		}
 
-		// Restore theme mode if it was backed up
-		if (themeStateBackup.themeMode) {
+		// Restore to original Obsidian theme mode
+		if (originalObsidianThemeMode) {
 			const currentMode = getCurrentThemeMode(app);
-			if (currentMode !== themeStateBackup.themeMode) {
-				await setThemeMode(app, themeStateBackup.themeMode);
-				changes.push(`Mode: ${themeStateBackup.themeMode}`);
+			if (currentMode !== originalObsidianThemeMode) {
+				await setThemeMode(app, originalObsidianThemeMode);
+				changes.push(`Mode: ${originalObsidianThemeMode}`);
 			}
 		}
 
-		if (changes.length > 0) {
-			console.log('Context Workspaces: Restored theme state:', changes.join(', '));
+		if (changes.length > 0 && process.env.NODE_ENV === 'development') {
+			console.log('Context Workspaces: Restored to original Obsidian theme:', changes.join(', '));
 		}
 
 		// Clear backup after restoration
@@ -640,9 +778,27 @@ export async function restoreThemeState(app: App): Promise<void> {
 }
 
 /**
- * Clear theme state backup
+ * Clear theme state backup and original theme tracking
  */
 export function clearThemeStateBackup(): void {
 	themeStateBackup = null;
-	console.log('Context Workspaces: Theme state backup cleared');
+	originalObsidianTheme = null;
+	originalObsidianThemeMode = null;
+	if (process.env.NODE_ENV === 'development') {
+		console.log('Context Workspaces: Theme state backup and original theme tracking cleared');
+	}
+}
+
+/**
+ * Get the original Obsidian theme (before any workspace-specific changes)
+ */
+export function getOriginalObsidianTheme(): string | null {
+	return originalObsidianTheme;
+}
+
+/**
+ * Get the original Obsidian theme mode (before any workspace-specific changes)
+ */
+export function getOriginalObsidianThemeMode(): ThemeMode | null {
+	return originalObsidianThemeMode;
 }

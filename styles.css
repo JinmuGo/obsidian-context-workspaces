@@ -8,6 +8,44 @@
 	--obsidian-context-workspaces-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
+/* ===== REACT MODAL STYLES ===== */
+/* ReactModalWrapper에서 인라인 스타일로 할당된 스타일들을 CSS로 이동 */
+
+.react-modal-container {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	z-index: 1000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.react-modal-backdrop {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background: rgba(0, 0, 0, 0.5);
+}
+
+.react-modal-content {
+	position: relative;
+	z-index: 1001;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	max-width: 90vw;
+	max-height: 90vh;
+	overflow: auto;
+	padding: 20px;
+	width: auto;
+}
+
 /* ===== SETTINGS TAB STYLES ===== */
 
 .obsidian-context-workspaces-settings {

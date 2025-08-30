@@ -5,18 +5,6 @@ import {
 	validateSpaceConfig,
 } from '../src/utils/space-utils';
 
-// Jest type declarations
-declare global {
-	var jest: {
-		fn: () => jest.Mock;
-	};
-	var describe: (name: string, fn: () => void) => void;
-	var test: (name: string, fn: () => void | Promise<void>) => void;
-	var expect: (value: unknown) => jest.Matchers<void>;
-	var beforeEach: (fn: () => void | Promise<void>) => void;
-	var afterEach: (fn: () => void | Promise<void>) => void;
-}
-
 describe('Space Utils tests', () => {
 	describe('generateSpaceId', () => {
 		test('Should generate unique IDs', () => {

@@ -1,17 +1,5 @@
 // Jest test environment setup
 
-// Global type declarations
-declare global {
-	var jest: {
-		fn: () => jest.Mock;
-	};
-	var describe: (name: string, fn: () => void) => void;
-	var test: (name: string, fn: () => void | Promise<void>) => void;
-	var expect: (value: unknown) => jest.Matchers<void>;
-	var beforeEach: (fn: () => void | Promise<void>) => void;
-	var afterEach: (fn: () => void | Promise<void>) => void;
-}
-
 // Global mocking setup
 if (typeof global.TextEncoder === 'undefined') {
 	global.TextEncoder = require('node:util').TextEncoder;
