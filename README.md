@@ -4,6 +4,10 @@
 
 Context Workspaces extends Obsidian's built-in Workspace functionality to provide a fast and intuitive context switching experience similar to Arc browser.
 
+## Quick Demo
+ 
+https://github.com/user-attachments/assets/3e9b9ffa-e861-431d-88f4-cbb306b79c4f
+
 ## Key Features
 
 ### Auto Save/Restore Mode
