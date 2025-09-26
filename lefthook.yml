@@ -1,0 +1,13 @@
+pre-commit:
+  parallel: false
+  commands:
+    lint-staged:
+      glob: "*.{js,ts,jsx,tsx}"
+      run: pnpm biome lint --write {staged_files}
+      stage_fixed: true
+    type-check:
+      glob: "*.{js,ts,jsx,tsx}"
+      run: pnpm tsc --noEmit --skipLibCheck
+    test:
+      glob: "*.{js,ts,jsx,tsx}"
+      run: pnpm test 
