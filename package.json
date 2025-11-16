@@ -1,7 +1,7 @@
 {
 	"name": "obsidian-context-workspaces",
 	"version": "0.0.1",
-	"description": "A workspace toolkit to build focused, clutter-free zones for every task",
+	"description": "A workspace toolkit to build focused, clutter-free zones for every task.",
 	"main": "main.js",
 	"engines": {
 		"node": ">=22",

@@ -3,7 +3,7 @@
 	"name": "Context Workspaces",
 	"version": "0.0.1",
 	"minAppVersion": "0.15.0",
-	"description": "A workspace toolkit to build focused, clutter-free zones for every task",
+	"description": "A workspace toolkit to build focused, clutter-free zones for every task.",
 	"author": "jinmugo",
 	"authorUrl": "https://github.com/jinmugo",
 	"isDesktopOnly": false
