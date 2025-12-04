@@ -283,12 +283,12 @@ export class AsyncQueue {
 		this.running++;
 		const task = this.queue.shift();
 		if (task) {
-			try {
-				await task();
-			} finally {
-				this.running--;
-				this.process();
-			}
+		try {
+			await task();
+		} finally {
+			this.running--;
+			void this.process();
+		}
 		}
 	}
 

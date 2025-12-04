@@ -14,7 +14,7 @@ interface SpaceItemProps {
 	spaceId: string;
 	space: SpaceConfig;
 	isActive: boolean;
-	onToggleAutoSave: (spaceId: string) => void;
+	onToggleAutoSave: (spaceId: string) => void | Promise<void>;
 	onEditSpace: (spaceId: string) => void;
 	onDeleteSpace: (spaceId: string) => void;
 }
