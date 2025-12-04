@@ -318,8 +318,7 @@ export const SidebarManager: React.FC<SidebarManagerProps> = ({ plugin }) => {
 							className="obsidian-context-workspaces-help-btn"
 							onClick={() => {
 								new Notice(
-									// eslint-disable-next-line obsidianmd/ui/sentence-case
-									'💡 Tip: Double-click to switch spaces, drag to reorder',
+									'💡 tip: double-click to switch spaces, drag to reorder',
 									3000
 								);
 							}}

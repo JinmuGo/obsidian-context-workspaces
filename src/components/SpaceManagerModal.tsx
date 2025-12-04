@@ -29,10 +29,10 @@ export const SpaceManagerModal: React.FC<SpaceManagerModalProps> = ({
 		setSpaces(updatedSpaces);
 
 		// Update sidebar
-		plugin.updateSidebarSpacesOptimized();
+		void plugin.updateSidebarSpacesOptimized();
 	};
 
-	const handleDeleteSpace = async (spaceId: string) => {
+	const handleDeleteSpace = (spaceId: string) => {
 		const space = spaces[spaceId];
 		
 		// Check if this is the last remaining space
@@ -45,16 +45,18 @@ export const SpaceManagerModal: React.FC<SpaceManagerModalProps> = ({
 		new ConfirmModal(
 			app as App,
 			`Are you sure you want to delete '${space.name}' space?`,
-			async () => {
-				await plugin.deleteSpace(spaceId);
+			() => {
+				void (async () => {
+					await plugin.deleteSpace(spaceId);
 
-				// Update local state
-				const updatedSpaces = { ...spaces };
-				delete updatedSpaces[spaceId];
-				setSpaces(updatedSpaces);
+					// Update local state
+					const updatedSpaces = { ...spaces };
+					delete updatedSpaces[spaceId];
+					setSpaces(updatedSpaces);
 
-				const updatedSpaceOrder = spaceOrder.filter((id: string) => id !== spaceId);
-				setSpaceOrder(updatedSpaceOrder);
+					const updatedSpaceOrder = spaceOrder.filter((id: string) => id !== spaceId);
+					setSpaceOrder(updatedSpaceOrder);
+				})();
 			}
 		).open();
 	};
@@ -128,11 +130,13 @@ export const SpaceManagerModal: React.FC<SpaceManagerModalProps> = ({
 												<button
 													type="button"
 													className={`obsidian-context-workspaces-switch-toggle ${space.autoSave ? 'active' : ''}`}
-													onClick={() => handleAutoSaveToggle(spaceId)}
+													onClick={() => {
+														void handleAutoSaveToggle(spaceId);
+													}}
 													onKeyDown={(e) => {
 														if (e.key === 'Enter' || e.key === ' ') {
 															e.preventDefault();
-															handleAutoSaveToggle(spaceId);
+															void handleAutoSaveToggle(spaceId);
 														}
 													}}
 													aria-label={`Toggle auto-save for ${space.name}`}

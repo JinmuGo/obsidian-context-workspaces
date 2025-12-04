@@ -118,7 +118,7 @@ export const SpaceEditModal: React.FC<SpaceEditModalProps> = ({
 			updatedSpace.description = description.trim() || undefined;
 
 			await plugin.saveSettings();
-			plugin.updateSidebarSpacesOptimized();
+			void plugin.updateSidebarSpacesOptimized();
 
 			// Sync name change with Obsidian's internal workspace API
 			if (oldName !== trimmedName) {
@@ -293,7 +293,9 @@ export const SpaceEditModal: React.FC<SpaceEditModalProps> = ({
 						<button
 							type="button"
 							className="obsidian-context-workspaces-button obsidian-context-workspaces-cta"
-							onClick={handleSave}
+							onClick={() => {
+								void handleSave();
+							}}
 						>
 							Save
 						</button>
