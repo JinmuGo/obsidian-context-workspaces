@@ -1,11 +1,14 @@
 // Jest test environment setup
 
+import { TextDecoder, TextEncoder } from 'node:util';
+
 // Global mocking setup
 if (typeof global.TextEncoder === 'undefined') {
-	global.TextEncoder = require('node:util').TextEncoder;
+	global.TextEncoder = TextEncoder;
 }
 if (typeof global.TextDecoder === 'undefined') {
-	global.TextDecoder = require('node:util').TextDecoder;
+	// @ts-expect-error - TextDecoder types might not match exactly but good for polyfill
+	global.TextDecoder = TextDecoder;
 }
 
 // DOM 환경 설정

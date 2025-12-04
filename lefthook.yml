@@ -3,7 +3,7 @@ pre-commit:
   commands:
     lint-staged:
       glob: "*.{js,ts,jsx,tsx}"
-      run: pnpm biome lint --write {staged_files}
+      run: pnpm eslint --fix {staged_files}
       stage_fixed: true
     type-check:
       glob: "*.{js,ts,jsx,tsx}"

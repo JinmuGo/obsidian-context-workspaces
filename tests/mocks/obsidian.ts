@@ -38,7 +38,10 @@ function addObsidianMethods(element: HTMLElement): ObsidianElement {
 		return addObsidianMethods(div) as unknown as HTMLDivElement & ObsidianElement;
 	};
 
-	el.createEl = (tag: string, options?: CreateElementOptions) => {
+	el.createEl = <K extends keyof HTMLElementTagNameMap>(
+		tag: K,
+		options?: CreateElementOptions,
+	): HTMLElementTagNameMap[K] => {
 		const createdElement = document.createElement(tag);
 		if (options?.cls) {
 			createdElement.className = options.cls;
@@ -55,7 +58,7 @@ function addObsidianMethods(element: HTMLElement): ObsidianElement {
 		if (options?.type) {
 			(createdElement as HTMLInputElement).type = options.type;
 		}
-		return addObsidianMethods(createdElement);
+		return addObsidianMethods(createdElement) as unknown as HTMLElementTagNameMap[K];
 	};
 
 	return el;
