@@ -58,17 +58,15 @@ export function validateString(
 		return { isValid: false, errors };
 	}
 
-	const str = value as string;
-
-	if (rules.minLength !== undefined && str.length < rules.minLength) {
+	if (rules.minLength !== undefined && value.length < rules.minLength) {
 		errors.push(`Minimum length is ${rules.minLength} characters`);
 	}
 
-	if (rules.maxLength !== undefined && str.length > rules.maxLength) {
+	if (rules.maxLength !== undefined && value.length > rules.maxLength) {
 		errors.push(`Maximum length is ${rules.maxLength} characters`);
 	}
 
-	if (rules.pattern && !rules.pattern.test(str)) {
+	if (rules.pattern && !rules.pattern.test(value)) {
 		errors.push('Value does not match required pattern');
 	}
 
@@ -106,7 +104,7 @@ export function validateSpaceConfig(config: unknown): boolean {
 		return false;
 	}
 
-	if (space.themeMode !== undefined && !['light', 'dark', 'system'].includes(space.themeMode as string)) {
+	if (space.themeMode !== undefined && (typeof space.themeMode !== 'string' || !['light', 'dark', 'system'].includes(space.themeMode))) {
 		return false;
 	}
 

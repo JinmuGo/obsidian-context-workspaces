@@ -168,8 +168,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 
 	async initializeDefaultSpace() {
 		if (!isWorkspacesPluginEnabled(this.app)) {
-			// eslint-disable-next-line obsidianmd/ui/sentence-case
-			new Notice('Context Workspaces requires the Workspaces plugin to be enabled.');
+			new Notice('Context workspaces requires the workspaces plugin to be enabled.');
 			return;
 		}
 
@@ -640,8 +639,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 
 					// For current workspace deletion, show a more prominent warning
 					new Notice(
-						// eslint-disable-next-line obsidianmd/ui/sentence-case
-						`Warning: Current workspace appears to be deleted. Switching to default workspace.`,
+						`Warning: current workspace appears to be deleted. Switching to default workspace.`,
 						5000
 					);
 				}
@@ -752,17 +750,19 @@ export default class ContextWorkspacesPlugin extends Plugin {
 
 		// Check for workspace deletions on startup
 		if (needsDeletionDetection(this.app, this.settings)) {
-			await safeDeletionDetection(this.app, this.settings);
+			safeDeletionDetection(this.app, this.settings);
 		}
 
 		// Set up periodic sync (every 30 seconds) only if sync is needed
-		setInterval(async () => {
-			if (
-				needsSync(this.app, this.settings) ||
-				needsDeletionDetection(this.app, this.settings)
-			) {
-				await this.handleWorkspaceChange();
-			}
+		setInterval(() => {
+			void (async () => {
+				if (
+					needsSync(this.app, this.settings) ||
+					needsDeletionDetection(this.app, this.settings)
+				) {
+					this.handleWorkspaceChange();
+				}
+			})();
 		}, 30000);
 	}
 }

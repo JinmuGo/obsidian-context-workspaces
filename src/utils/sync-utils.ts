@@ -36,7 +36,6 @@ export async function performBidirectionalSync(
 
 	try {
 		const obsidianWorkspaceNames = getObsidianWorkspaceNames(app);
-		let _hasChanges = false;
 
 		for (const [workspaceId, workspaceName] of Object.entries(obsidianWorkspaceNames)) {
 			if (!settings.spaces[workspaceId]) {
@@ -51,7 +50,6 @@ export async function performBidirectionalSync(
 				}
 
 				result.importedFromObsidian.push(workspaceId);
-				_hasChanges = true;
 			} else {
 				// Check for name conflicts with existing workspace
 				const contextName = settings.spaces[workspaceId].name;
@@ -66,8 +64,6 @@ export async function performBidirectionalSync(
 						contextName,
 						resolvedName,
 					});
-
-					_hasChanges = true;
 				}
 			}
 		}

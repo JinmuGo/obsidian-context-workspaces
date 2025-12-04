@@ -55,9 +55,9 @@ export class PerformanceMonitor {
 							performance.now() - start,
 							timestamp,
 							false,
-							error.message
+							error instanceof Error ? error.message : String(error)
 						);
-						throw error;
+						return Promise.reject(error instanceof Error ? error : new Error(String(error)));
 					});
 			}
 			this.recordResult(name, performance.now() - start, timestamp, true);
@@ -70,7 +70,7 @@ export class PerformanceMonitor {
 				false,
 				error instanceof Error ? error.message : String(error)
 			);
-			throw error;
+			throw error instanceof Error ? error : new Error(String(error));
 		}
 	}
 
@@ -265,10 +265,10 @@ export class AsyncQueue {
 					await task();
 					resolve();
 				} catch (error) {
-					reject(error);
+					reject(error instanceof Error ? error : new Error(String(error)));
 				}
 			});
-			this.process();
+			void this.process();
 		});
 	}
 

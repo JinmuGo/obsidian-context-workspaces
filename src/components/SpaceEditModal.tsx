@@ -133,7 +133,7 @@ export const SpaceEditModal: React.FC<SpaceEditModalProps> = ({
 			// If this is the current space, apply theme changes immediately
 			if (isCurrentSpace && (updatedSpace.theme || updatedSpace.themeMode)) {
 				try {
-					await applySpaceTheme(
+					applySpaceTheme(
 						plugin.app as App,
 						updatedSpace.theme,
 						updatedSpace.themeMode
@@ -167,9 +167,9 @@ export const SpaceEditModal: React.FC<SpaceEditModalProps> = ({
 		onClose();
 	};
 
-	const handleKeyDown = (evt: React.KeyboardEvent) => {
+	const handleKeyDown = async (evt: React.KeyboardEvent) => {
 		if (evt.key === 'Enter') {
-			handleSave();
+			await handleSave();
 		} else if (evt.key === 'Escape') {
 			onClose();
 		}
@@ -234,7 +234,7 @@ export const SpaceEditModal: React.FC<SpaceEditModalProps> = ({
 								type="text"
 								value={name}
 								onChange={(e) => setName(e.target.value)}
-								onKeyDown={handleKeyDown}
+								onKeyDown={(e) => void handleKeyDown(e)}
 							/>
 						</div>
 					</div>
