@@ -450,11 +450,11 @@ export async function setThemeMode(app: App, mode: ThemeMode): Promise<void> {
 /**
  * Apply space theme settings
  */
-export async function applySpaceTheme(
+export function applySpaceTheme(
 	app: App,
 	theme?: string,
 	themeMode?: ThemeMode
-): Promise<void> {
+): void {
 	try {
 		const changes: string[] = [];
 

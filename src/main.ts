@@ -123,25 +123,27 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		backupThemeState(this.app);
 
 		// Apply current space theme on load
-		setTimeout(async () => {
+		setTimeout(() => {
 			try {
-				await this.applyCurrentSpaceTheme();
+				this.applyCurrentSpaceTheme();
 			} catch (error) {
 				console.error('Failed to apply current space theme on load:', error);
 			}
 		}, 1000); // Delay to ensure Obsidian is fully loaded
 	}
 
-	async onunload() {
+	onunload() {
 		// Save current state
-		await this.saveCurrentSpaceState();
+		this.saveCurrentSpaceState();
 
 		// Restore original Obsidian theme before unloading
-		try {
-			await restoreThemeState(this.app);
-		} catch (error) {
-			console.error('Failed to restore original Obsidian theme on unload:', error);
-		}
+		void (async () => {
+			try {
+				await restoreThemeState(this.app);
+			} catch (error) {
+				console.error('Failed to restore original Obsidian theme on unload:', error);
+			}
+		})();
 
 		// Clear timeouts
 		clearTimeout(this.layoutChangeTimeout);
@@ -209,7 +211,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 
 		try {
 			// Save current space state
-			await this.saveCurrentSpaceState();
+			this.saveCurrentSpaceState();
 
 			// Switch to new space
 			this.settings.currentSpaceId = spaceId;
@@ -219,7 +221,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 			const space = this.settings.spaces[spaceId];
 			if (space && (space.theme || space.themeMode)) {
 				try {
-					await applySpaceTheme(this.app, space.theme, space.themeMode);
+					applySpaceTheme(this.app, space.theme, space.themeMode);
 				} catch (error) {
 					console.error('Failed to apply space theme:', error);
 					// If theme application fails, restore to original Obsidian theme
@@ -283,7 +285,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		}, 50);
 	}
 
-	async saveCurrentSpaceState() {
+	saveCurrentSpaceState() {
 		const currentSpaceId = this.settings.currentSpaceId;
 		const currentSpace = this.settings.spaces[currentSpaceId];
 
@@ -316,7 +318,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		const nextSpaceId = this.settings.spaceOrder[nextIndex];
 
 		if (nextSpaceId) {
-			this.switchToSpace(nextSpaceId);
+			void this.switchToSpace(nextSpaceId);
 		}
 	}
 
@@ -327,7 +329,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		const prevSpaceId = this.settings.spaceOrder[prevIndex];
 
 		if (prevSpaceId) {
-			this.switchToSpace(prevSpaceId);
+			void this.switchToSpace(prevSpaceId);
 		}
 	}
 
@@ -474,28 +476,32 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		}, 50);
 	}
 
-	async applyCurrentSpaceTheme() {
+	applyCurrentSpaceTheme() {
 		const currentSpace = this.settings.spaces[this.settings.currentSpaceId];
 		if (currentSpace && (currentSpace.theme || currentSpace.themeMode)) {
 			try {
-				await applySpaceTheme(this.app, currentSpace.theme, currentSpace.themeMode);
+				applySpaceTheme(this.app, currentSpace.theme, currentSpace.themeMode);
 			} catch (error) {
 				console.error('Failed to apply current space theme:', error);
 				// If theme application fails, restore to original Obsidian theme
-				try {
-					await restoreThemeState(this.app);
-				} catch (restoreError) {
-					console.error('Failed to restore theme state:', restoreError);
-				}
+				void (async () => {
+					try {
+						await restoreThemeState(this.app);
+					} catch (restoreError) {
+						console.error('Failed to restore theme state:', restoreError);
+					}
+				})();
 				throw error;
 			}
 		} else {
 			// If no theme is configured for current space, restore to original Obsidian theme
-			try {
-				await restoreThemeState(this.app);
-			} catch (restoreError) {
-				console.error('Failed to restore original theme:', restoreError);
-			}
+			void (async () => {
+				try {
+					await restoreThemeState(this.app);
+				} catch (restoreError) {
+					console.error('Failed to restore original theme:', restoreError);
+				}
+			})();
 		}
 	}
 
