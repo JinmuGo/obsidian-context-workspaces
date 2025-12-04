@@ -58,7 +58,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 
 		// Workspace changed event listener
 		this.registerEvent(
-			// @ts-expect-error
+			// @ts-expect-error - Event 'workspace-changed' is not in the public API types
 			this.app.workspace.on('workspace-changed', () => {
 				// Debounce workspace change events to prevent excessive calls
 				clearTimeout(this.workspaceChangeTimeout);
@@ -77,31 +77,31 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		// Add commands
 		this.addCommand({
 			id: 'next-space',
-			name: 'Next Space',
+			name: 'Next space',
 			callback: () => {
-				this.switchToNextSpace();
+				void this.switchToNextSpace();
 			},
 		});
 
 		this.addCommand({
 			id: 'previous-space',
-			name: 'Previous Space',
+			name: 'Previous space',
 			callback: () => {
-				this.switchToPreviousSpace();
+				void this.switchToPreviousSpace();
 			},
 		});
 
 		this.addCommand({
 			id: 'create-new-space',
-			name: 'Create New Space',
+			name: 'Create new space',
 			callback: () => {
-				this.createNewSpace();
+				void this.createNewSpace();
 			},
 		});
 
 		this.addCommand({
 			id: 'manage-spaces',
-			name: 'Manage Spaces',
+			name: 'Manage spaces',
 			callback: () => {
 				this.openSpaceManager();
 			},
@@ -166,6 +166,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 
 	async initializeDefaultSpace() {
 		if (!isWorkspacesPluginEnabled(this.app)) {
+			// eslint-disable-next-line obsidianmd/ui/sentence-case
 			new Notice('Context Workspaces requires the Workspaces plugin to be enabled.');
 			return;
 		}
@@ -291,7 +292,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		}
 
 		try {
-			await saveWorkspaceState(this.app, currentSpaceId);
+			saveWorkspaceState(this.app, currentSpaceId);
 		} catch (error) {
 			console.error('Failed to save workspace state:', error);
 		}
@@ -568,14 +569,10 @@ export default class ContextWorkspacesPlugin extends Plugin {
 	/**
 	 * Handle workspace changes (creation, deletion, modification) - optimized version
 	 */
-	async handleWorkspaceChange(): Promise<void> {
+	handleWorkspaceChange(): void {
 		try {
-			// Performance measurement start
-			const startTime = performance.now();
-
 			// 1. Get Obsidian workspace list only once (prevent duplicate calls)
 			const obsidianWorkspaceNames = getObsidianWorkspaceNames(this.app);
-			let hasChanges = false;
 			const deletedWorkspaces: string[] = [];
 			let currentWorkspaceDeleted = false;
 
@@ -604,7 +601,6 @@ export default class ContextWorkspacesPlugin extends Plugin {
 					}
 
 					deletedWorkspaces.push(spaceId);
-					hasChanges = true;
 
 					// Check if current workspace was deleted
 					if (spaceId === this.settings.currentSpaceId) {
@@ -638,7 +634,8 @@ export default class ContextWorkspacesPlugin extends Plugin {
 
 					// For current workspace deletion, show a more prominent warning
 					new Notice(
-						`Warning: Current workspace appears to be deleted. Switching to Default workspace.`,
+						// eslint-disable-next-line obsidianmd/ui/sentence-case
+						`Warning: Current workspace appears to be deleted. Switching to default workspace.`,
 						5000
 					);
 				}
@@ -666,24 +663,28 @@ export default class ContextWorkspacesPlugin extends Plugin {
 				}
 
 				// Save settings and update UI (asynchronous separation)
-				setTimeout(async () => {
-					await this.saveSettings();
-					this.updateSidebarSpaces();
-					this.sidebarManager.ensureExists();
+				void (async () => {
+					try {
+						await this.saveSettings();
+						this.updateSidebarSpaces();
+						this.sidebarManager.ensureExists();
 
-					// Show notification only for significant changes
-					if (currentWorkspaceDeleted) {
-						new Notice(
-							'Current workspace was deleted, switched to Default workspace.',
-							3000
-						);
-					} else if (deletedWorkspaces.length > 1) {
-						new Notice(
-							`${deletedWorkspaces.length} workspaces were removed from Context Workspaces.`,
-							3000
-						);
+						// Show notification only for significant changes
+						if (currentWorkspaceDeleted) {
+							new Notice(
+								'Current workspace was deleted, switched to default workspace.',
+								3000
+							);
+						} else if (deletedWorkspaces.length > 1) {
+							new Notice(
+								`${deletedWorkspaces.length} workspaces were removed from Context Workspaces.`,
+								3000
+							);
+						}
+					} catch (error) {
+						console.error('Failed to handle deleted workspaces:', error);
 					}
-				}, 0);
+				})();
 			}
 
 			// 4. Detect new workspaces (synchronous processing)
@@ -691,7 +692,6 @@ export default class ContextWorkspacesPlugin extends Plugin {
 			for (const [workspaceId] of Object.entries(obsidianWorkspaceNames)) {
 				if (!this.settings.spaces[workspaceId] && workspaceId !== 'default') {
 					newWorkspaces.push(workspaceId);
-					hasChanges = true;
 				}
 			}
 
@@ -718,24 +718,19 @@ export default class ContextWorkspacesPlugin extends Plugin {
 				}
 
 				// Save settings and update UI
-				setTimeout(async () => {
-					await this.saveSettings();
-					this.updateSidebarSpaces();
+				void (async () => {
+					try {
+						await this.saveSettings();
+						this.updateSidebarSpaces();
 
-					// Show notification
-					new Notice(
-						`${newWorkspaces.length} new workspaces were imported from Obsidian.`
-					);
-				}, 0);
-			}
-
-			// Performance measurement end
-			const endTime = performance.now();
-			// Only log performance in development mode
-			if (hasChanges && process.env.NODE_ENV === 'development') {
-				console.log(
-					`Workspace change handled in ${(endTime - startTime).toFixed(2)}ms`
-				);
+						// Show notification
+						new Notice(
+							`${newWorkspaces.length} new workspaces were imported from Obsidian.`
+						);
+					} catch (error) {
+						console.error('Failed to handle new workspaces:', error);
+					}
+				})();
 			}
 		} catch (error) {
 			console.error('Failed to handle workspace change:', error);

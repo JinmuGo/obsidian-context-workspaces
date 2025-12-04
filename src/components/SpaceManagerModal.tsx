@@ -1,16 +1,18 @@
-import { Notice } from 'obsidian';
+import { type App, Notice } from 'obsidian';
 import type React from 'react';
 import { useState } from 'react';
 import type { ContextWorkspacesPlugin } from '../types';
+import { ConfirmModal } from './ConfirmModal';
 
 interface SpaceManagerModalProps {
-	app?: unknown;
+	app: unknown;
 	plugin: ContextWorkspacesPlugin;
 	isOpen: boolean;
 	onClose: () => void;
 }
 
 export const SpaceManagerModal: React.FC<SpaceManagerModalProps> = ({
+	app,
 	plugin,
 	isOpen,
 	onClose,
@@ -40,17 +42,21 @@ export const SpaceManagerModal: React.FC<SpaceManagerModalProps> = ({
 			return;
 		}
 		
-		if (confirm(`Are you sure you want to delete '${space.name}' space?`)) {
-			await plugin.deleteSpace(spaceId);
+		new ConfirmModal(
+			app as App,
+			`Are you sure you want to delete '${space.name}' space?`,
+			async () => {
+				await plugin.deleteSpace(spaceId);
 
-			// Update local state
-			const updatedSpaces = { ...spaces };
-			delete updatedSpaces[spaceId];
-			setSpaces(updatedSpaces);
+				// Update local state
+				const updatedSpaces = { ...spaces };
+				delete updatedSpaces[spaceId];
+				setSpaces(updatedSpaces);
 
-			const updatedSpaceOrder = spaceOrder.filter((id: string) => id !== spaceId);
-			setSpaceOrder(updatedSpaceOrder);
-		}
+				const updatedSpaceOrder = spaceOrder.filter((id: string) => id !== spaceId);
+				setSpaceOrder(updatedSpaceOrder);
+			}
+		).open();
 	};
 
 	if (!isOpen) return null;

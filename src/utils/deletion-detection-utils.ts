@@ -73,10 +73,6 @@ export function removeDeletedWorkspaces(
 		if (orderIndex !== -1) {
 			settings.spaceOrder.splice(orderIndex, 1);
 		}
-
-		if (process.env.NODE_ENV === 'development') {
-			console.log(`Removed deleted workspace from Context Workspaces: ${workspaceId}`);
-		}
 	}
 }
 
@@ -86,12 +82,7 @@ export function removeDeletedWorkspaces(
 export function switchToFirstWorkspace(settings: ContextWorkspacesSettings): void {
 	const firstSpaceId = settings.spaceOrder[0];
 	if (firstSpaceId && settings.currentSpaceId !== firstSpaceId) {
-		const oldWorkspaceId = settings.currentSpaceId;
 		settings.currentSpaceId = firstSpaceId;
-
-		if (process.env.NODE_ENV === 'development') {
-			console.log(`Switched from deleted workspace ${oldWorkspaceId} to first workspace ${firstSpaceId}`);
-		}
 	}
 }
 
@@ -109,10 +100,6 @@ export function handleWorkspaceDeletions(
 
 		if (detectionResult.needsCurrentWorkspaceSwitch) {
 			switchToFirstWorkspace(settings);
-		}
-
-		if (process.env.NODE_ENV === 'development') {
-			console.log(`Handled ${detectionResult.deletedWorkspaces.length} deleted workspace(s)`);
 		}
 	}
 
@@ -141,14 +128,11 @@ export function needsDeletionDetection(app: App, settings: ContextWorkspacesSett
  */
 let deletionDetectionInProgress = false;
 
-export async function safeDeletionDetection(
+export function safeDeletionDetection(
 	app: App,
 	settings: ContextWorkspacesSettings
-): Promise<DeletionDetectionResult | null> {
+): DeletionDetectionResult | null {
 	if (deletionDetectionInProgress) {
-		if (process.env.NODE_ENV === 'development') {
-			console.log('Deletion detection already in progress, skipping...');
-		}
 		return null;
 	}
 
@@ -156,13 +140,6 @@ export async function safeDeletionDetection(
 	try {
 		// Changed to synchronous processing (removed unnecessary Promise/setTimeout)
 		const result = handleWorkspaceDeletions(app, settings);
-
-		if (result.deletedWorkspaces.length > 0 && process.env.NODE_ENV === 'development') {
-			console.log(
-				`Detected and handled ${result.deletedWorkspaces.length} deleted workspace(s)`
-			);
-		}
-
 		return result;
 	} finally {
 		deletionDetectionInProgress = false;

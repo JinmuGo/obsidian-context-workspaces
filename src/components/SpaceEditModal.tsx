@@ -146,19 +146,14 @@ export const SpaceEditModal: React.FC<SpaceEditModalProps> = ({
 						if (workspace.trigger) {
 							workspace.trigger('css-change');
 						}
-						
+
 						// Force Obsidian to refresh the theme
 						const event = new CustomEvent('theme-change', { detail: { theme: updatedSpace.theme, mode: updatedSpace.themeMode } });
 						document.dispatchEvent(event);
-						
-						// Only log in development mode
-						if (process.env.NODE_ENV === 'development') {
-							console.log('Context Workspaces: Theme changes applied and UI refreshed');
-						}
 					}, 100);
 				} catch (error) {
 					console.error('Failed to apply theme changes:', error);
-					new Notice('❌ Failed to apply theme changes');
+					new Notice('Failed to apply theme changes');
 				}
 			}
 
@@ -232,7 +227,7 @@ export const SpaceEditModal: React.FC<SpaceEditModalProps> = ({
 
 						{/* Space name input */}
 						<div className="obsidian-context-workspaces-name-container">
-							<label htmlFor={spaceNameId}>Space Name:</label>
+							<label htmlFor={spaceNameId}>Space name:</label>
 							<input
 								id={spaceNameId}
 								ref={nameInputRef}
@@ -246,7 +241,7 @@ export const SpaceEditModal: React.FC<SpaceEditModalProps> = ({
 
 					{/* Theme selection */}
 					<div>
-						<label htmlFor={themeSelectId}>Theme (Optional):</label>
+						<label htmlFor={themeSelectId}>Theme (optional):</label>
 						<select
 							id={themeSelectId}
 							value={theme}
@@ -263,7 +258,7 @@ export const SpaceEditModal: React.FC<SpaceEditModalProps> = ({
 
 					{/* Theme mode selection */}
 					<div>
-						<label htmlFor={themeModeSelectId}>Theme Mode:</label>
+						<label htmlFor={themeModeSelectId}>Theme mode:</label>
 						<select
 							id={themeModeSelectId}
 							value={themeMode}
@@ -279,7 +274,7 @@ export const SpaceEditModal: React.FC<SpaceEditModalProps> = ({
 
 					{/* Description input */}
 					<div>
-						<label htmlFor={spaceDescriptionId}>Description (Optional):</label>
+						<label htmlFor={spaceDescriptionId}>Description (optional):</label>
 						<textarea
 							id={spaceDescriptionId}
 							value={description}

@@ -168,7 +168,8 @@ export function validateSettings(settings: unknown): boolean {
 	}
 
 	// Validate space order
-	for (const spaceId of config.spaceOrder as string[]) {
+	const spaceOrder = config.spaceOrder;
+	for (const spaceId of spaceOrder) {
 		if (!validateSpaceId(spaceId)) {
 			return false;
 		}

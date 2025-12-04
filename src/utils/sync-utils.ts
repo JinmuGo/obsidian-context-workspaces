@@ -52,9 +52,6 @@ export async function performBidirectionalSync(
 
 				result.importedFromObsidian.push(workspaceId);
 				_hasChanges = true;
-				if (process.env.NODE_ENV === 'development') {
-					console.log(`Imported workspace from Obsidian: ${workspaceName} (${workspaceId})`);
-				}
 			} else {
 				// Check for name conflicts with existing workspace
 				const contextName = settings.spaces[workspaceId].name;
@@ -71,11 +68,6 @@ export async function performBidirectionalSync(
 					});
 
 					_hasChanges = true;
-					if (process.env.NODE_ENV === 'development') {
-						console.log(
-							`Resolved name conflict for ${workspaceId}: "${contextName}" → "${resolvedName}"`
-						);
-					}
 				}
 			}
 		}
@@ -86,11 +78,6 @@ export async function performBidirectionalSync(
 				try {
 					await createObsidianWorkspace(app, spaceId, settings.spaces[spaceId].name);
 					result.createdInObsidian.push(spaceId);
-					if (process.env.NODE_ENV === 'development') {
-						console.log(
-							`Created workspace in Obsidian: ${settings.spaces[spaceId].name} (${spaceId})`
-						);
-					}
 				} catch (error) {
 					result.errors.push({
 						workspaceId: spaceId,
@@ -135,10 +122,6 @@ export function notifySyncResult(result: SyncResult): void {
 	if (result.errors.length > 0) {
 		messages.push(`${result.errors.length} errors occurred.`);
 	}
-
-	if (messages.length > 0 && process.env.NODE_ENV === 'development') {
-		console.log('Sync Result:', messages.join(' '));
-	}
 }
 
 /**
@@ -180,9 +163,6 @@ export async function safeBidirectionalSync(
 	settings: ContextWorkspacesSettings
 ): Promise<SyncResult | null> {
 	if (syncInProgress) {
-		if (process.env.NODE_ENV === 'development') {
-			console.log('Sync already in progress, skipping...');
-		}
 		return null;
 	}
 

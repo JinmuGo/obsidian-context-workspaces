@@ -1,4 +1,6 @@
 import { type App, Modal, Notice } from 'obsidian';
+import * as React from 'react';
+import { createRoot } from 'react-dom/client';
 import type { EmojiData, ThemeMode } from '../types';
 import { getAvailableThemes, getCurrentTheme, getCurrentThemeModeForUI } from '../utils/obsidian-utils';
 import { EmojiPicker } from './EmojiPicker';
@@ -36,7 +38,7 @@ export class SpaceCreateModal extends Modal {
 		contentEl.addClass('obsidian-context-workspaces-space-create-modal');
 
 		// Set modal header
-		this.titleEl.setText('Create New Space');
+		this.titleEl.setText('Create new space');
 
 		// Modal content area
 		const modalContent = contentEl.createDiv('obsidian-context-workspaces-modal-content');
@@ -46,7 +48,7 @@ export class SpaceCreateModal extends Modal {
 
 		// Icon selection area
 		const iconSection = inputSection.createDiv('obsidian-context-workspaces-icon-section');
-		const _iconLabel = iconSection.createEl('label', { text: 'Emoji' });
+		iconSection.createEl('label', { text: 'Emoji' });
 		this.iconButton = iconSection.createEl('button', {
 			cls: 'obsidian-context-workspaces-icon-picker-button',
 			text: this.icon,
@@ -58,7 +60,7 @@ export class SpaceCreateModal extends Modal {
 
 		// Name input area
 		const nameSection = inputSection.createDiv('obsidian-context-workspaces-name-section');
-		const _nameLabel = nameSection.createEl('label', { text: 'Space Name' });
+		nameSection.createEl('label', { text: 'Space name' });
 		this.nameInput = nameSection.createEl('input', {
 			type: 'text',
 			placeholder: 'e.g. Project Alpha, Research Notes',
@@ -91,7 +93,7 @@ export class SpaceCreateModal extends Modal {
 
 		// Theme selection area
 		const themeSection = modalContent.createDiv('obsidian-context-workspaces-theme-section');
-		const _themeLabel = themeSection.createEl('label', { text: 'Theme (Optional)' });
+		themeSection.createEl('label', { text: 'Theme (optional)' });
 		this.themeSelectEl = themeSection.createEl('select');
 		const emptyOption = this.themeSelectEl.createEl('option', { text: 'Use Obsidian theme' });
 		emptyOption.value = '';
@@ -111,7 +113,7 @@ export class SpaceCreateModal extends Modal {
 		const themeModeSection = modalContent.createDiv(
 			'obsidian-context-workspaces-theme-mode-section'
 		);
-		const _themeModeLabel = themeModeSection.createEl('label', { text: 'Theme Mode' });
+		themeModeSection.createEl('label', { text: 'Theme mode' });
 		this.themeModeSelectEl = themeModeSection.createEl('select');
 		const lightOpt = this.themeModeSelectEl.createEl('option', { text: 'Light' });
 		lightOpt.value = 'light';
@@ -129,8 +131,8 @@ export class SpaceCreateModal extends Modal {
 		const descriptionSection = modalContent.createDiv(
 			'obsidian-context-workspaces-description-section'
 		);
-		const _descriptionLabel = descriptionSection.createEl('label', {
-			text: 'Description (Optional)',
+		descriptionSection.createEl('label', {
+			text: 'Description (optional)',
 		});
 		this.descriptionTextarea = descriptionSection.createEl('textarea', {
 			placeholder: 'Enter a description for this space...',
@@ -239,9 +241,6 @@ export class SpaceCreateModal extends Modal {
 				);
 
 				// Create React component for emoji picker
-				const React = require('react');
-				const { createRoot } = require('react-dom/client');
-
 				const root = createRoot(this.emojiPickerContainer);
 				root.render(
 					React.createElement(EmojiPicker, {

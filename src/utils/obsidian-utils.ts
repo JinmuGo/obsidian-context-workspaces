@@ -2,7 +2,6 @@ import type { App } from 'obsidian';
 import type {
 	ContextWorkspacesPluginLike,
 	ThemeMode,
-	ThemeStateBackup,
 	WorkspacesInstance,
 } from '../types';
 
@@ -28,7 +27,7 @@ export function isWorkspacesPluginEnabled(app: App): boolean {
 /**
  * Save workspace state using Obsidian's internal API
  */
-export async function saveWorkspaceState(app: App, workspaceId: string): Promise<void> {
+export function saveWorkspaceState(app: App, workspaceId: string): void {
 	try {
 		const workspaces = getWorkspacesPlugin(app);
 		if (workspaces?.enabled && workspaces.instance) {
@@ -458,7 +457,6 @@ export async function applySpaceTheme(
 ): Promise<void> {
 	try {
 		const changes: string[] = [];
-		let hasChanges = false;
 
 		// Apply theme if specified
 		if (theme !== undefined) {
@@ -475,9 +473,8 @@ export async function applySpaceTheme(
 			const currentTheme = getCurrentTheme(app);
 			if (currentTheme !== themeToApply) {
 				// Apply theme without changing Obsidian's default theme setting
-				await setThemeTemporarily(app, themeToApply);
+				setThemeTemporarily(app, themeToApply);
 				changes.push(`Theme: ${themeToApply}`);
-				hasChanges = true;
 			}
 		}
 
@@ -486,15 +483,9 @@ export async function applySpaceTheme(
 			const currentMode = getCurrentThemeMode(app);
 			if (currentMode !== themeMode) {
 				// Apply theme mode without changing Obsidian's default theme mode setting
-				await setThemeModeTemporarily(app, themeMode);
+				setThemeModeTemporarily(app, themeMode);
 				changes.push(`Mode: ${themeMode}`);
-				hasChanges = true;
 			}
-		}
-
-		// Log changes for debugging (only in development mode)
-		if (hasChanges && process.env.NODE_ENV === 'development') {
-			console.log('Context Workspaces: Applied theme changes:', changes.join(', '));
 		}
 	} catch (error) {
 		console.error('Failed to apply space theme:', error);
@@ -505,7 +496,7 @@ export async function applySpaceTheme(
 /**
  * Set theme temporarily without changing Obsidian's default theme setting
  */
-async function setThemeTemporarily(app: App, themeName: string): Promise<void> {
+function setThemeTemporarily(app: App, themeName: string): void {
 	try {
 		// Method 1: Use customCss.setTheme if available (safest method)
 		// @ts-expect-error - Obsidian internal API access
@@ -559,7 +550,7 @@ async function setThemeTemporarily(app: App, themeName: string): Promise<void> {
 /**
  * Set theme mode temporarily without changing Obsidian's default theme mode setting
  */
-async function setThemeModeTemporarily(app: App, mode: ThemeMode): Promise<void> {
+function setThemeModeTemporarily(app: App, mode: ThemeMode): void {
 	try {
 		const body = document.body;
 		const currentMode = getCurrentThemeMode(app);
@@ -657,19 +648,13 @@ export function setupWorkspaceLoadMonitoring(app: App, plugin: ContextWorkspaces
 
 			if (spaceExists && workspaceId !== currentSpaceId) {
 				// Switch to the corresponding Context Space
-				setTimeout(async () => {
-					try {
-						await plugin.switchToSpace(workspaceId);
-					} catch (error) {
+				setTimeout(() => {
+					void plugin.switchToSpace(workspaceId).catch((error) => {
 						console.error('Failed to auto-switch to Context Space:', error);
-					}
+					});
 				}, 100); // Small delay to ensure workspace is fully loaded
 			}
 		};
-
-		if (process.env.NODE_ENV === 'development') {
-			console.log('Context Workspaces: Workspace load monitoring enabled');
-		}
 	} catch (error) {
 		console.error('Failed to setup workspace load monitoring:', error);
 	}
@@ -690,10 +675,6 @@ export function removeWorkspaceLoadMonitoring(app: App): void {
 			workspaces.instance.loadWorkspace = workspaces.instance._originalLoadWorkspace;
 			delete workspaces.instance._originalLoadWorkspace;
 		}
-
-		if (process.env.NODE_ENV === 'development') {
-			console.log('Context Workspaces: Workspace load monitoring disabled');
-		}
 	} catch (error) {
 		console.error('Failed to remove workspace load monitoring:', error);
 	}
@@ -702,7 +683,6 @@ export function removeWorkspaceLoadMonitoring(app: App): void {
 /**
  * Store for theme state backup
  */
-let themeStateBackup: ThemeStateBackup | null = null;
 let originalObsidianTheme: string | null = null;
 let originalObsidianThemeMode: ThemeMode | null = null;
 
@@ -718,16 +698,6 @@ export function backupThemeState(app: App): void {
 		if (originalObsidianThemeMode === null) {
 			originalObsidianThemeMode = getCurrentThemeMode(app);
 		}
-
-		// Backup current state (which might be workspace-specific)
-		themeStateBackup = {
-			theme: getCurrentTheme(app),
-			themeMode: getCurrentThemeMode(app),
-		};
-		if (process.env.NODE_ENV === 'development') {
-			console.log('Context Workspaces: Theme state backed up:', themeStateBackup);
-			console.log('Context Workspaces: Original Obsidian theme:', originalObsidianTheme);
-		}
 	} catch (error) {
 		console.error('Failed to backup theme state:', error);
 	}
@@ -739,9 +709,6 @@ export function backupThemeState(app: App): void {
 export async function restoreThemeState(app: App): Promise<void> {
 	try {
 		if (!originalObsidianTheme && !originalObsidianThemeMode) {
-			if (process.env.NODE_ENV === 'development') {
-				console.log('Context Workspaces: No original Obsidian theme to restore');
-			}
 			return;
 		}
 
@@ -764,13 +731,6 @@ export async function restoreThemeState(app: App): Promise<void> {
 				changes.push(`Mode: ${originalObsidianThemeMode}`);
 			}
 		}
-
-		if (changes.length > 0 && process.env.NODE_ENV === 'development') {
-			console.log('Context Workspaces: Restored to original Obsidian theme:', changes.join(', '));
-		}
-
-		// Clear backup after restoration
-		themeStateBackup = null;
 	} catch (error) {
 		console.error('Failed to restore theme state:', error);
 		throw error;
@@ -781,12 +741,8 @@ export async function restoreThemeState(app: App): Promise<void> {
  * Clear theme state backup and original theme tracking
  */
 export function clearThemeStateBackup(): void {
-	themeStateBackup = null;
 	originalObsidianTheme = null;
 	originalObsidianThemeMode = null;
-	if (process.env.NODE_ENV === 'development') {
-		console.log('Context Workspaces: Theme state backup and original theme tracking cleared');
-	}
 }
 
 /**

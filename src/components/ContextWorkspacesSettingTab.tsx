@@ -5,6 +5,7 @@ import type React from 'react';
 import { useEffect, useState } from 'react';
 import type { ContextWorkspacesPlugin, SpaceConfig } from '../types';
 import { isWorkspacesPluginEnabled } from '../utils/obsidian-utils';
+import { ConfirmModal } from './ConfirmModal';
 import { DndProvider } from './DndProvider';
 import { HelpModal } from './HelpModal';
 import { SpaceEditModal } from './SpaceEditModal';
@@ -186,7 +187,7 @@ export const ContextWorkspacesSettingTab: React.FC<ContextWorkspacesSettingTabPr
 
 			setSpaceOrder(newSpaceOrder);
 			plugin.settings.spaceOrder = newSpaceOrder;
-			plugin.saveSettings();
+			void plugin.saveSettings();
 		}
 	};
 
@@ -215,17 +216,21 @@ export const ContextWorkspacesSettingTab: React.FC<ContextWorkspacesSettingTabPr
 			return;
 		}
 
-		if (confirm(`Are you sure you want to delete '${space.name}' space?`)) {
-			await plugin.deleteSpace(spaceId);
+		new ConfirmModal(
+			plugin.app as App,
+			`Are you sure you want to delete '${space.name}' space?`,
+			async () => {
+				await plugin.deleteSpace(spaceId);
 
-			// Update local state
-			const updatedSpaces = { ...spaces };
-			delete updatedSpaces[spaceId];
-			setSpaces(updatedSpaces);
+				// Update local state
+				const updatedSpaces = { ...spaces };
+				delete updatedSpaces[spaceId];
+				setSpaces(updatedSpaces);
 
-			const updatedSpaceOrder = spaceOrder.filter((id: string) => id !== spaceId);
-			setSpaceOrder(updatedSpaceOrder);
-		}
+				const updatedSpaceOrder = spaceOrder.filter((id: string) => id !== spaceId);
+				setSpaceOrder(updatedSpaceOrder);
+			}
+		).open();
 	};
 
 	const handleSpaceEditSave = () => {
@@ -241,7 +246,7 @@ export const ContextWorkspacesSettingTab: React.FC<ContextWorkspacesSettingTabPr
 				<h2>Context Workspaces Settings</h2>
 
 				<div className="obsidian-context-workspaces-settings-header">
-					<h3>Spaces List</h3>
+					<h3>Spaces list</h3>
 					<button
 						type="button"
 						className="obsidian-context-workspaces-button obsidian-context-workspaces-cta"
@@ -252,7 +257,7 @@ export const ContextWorkspacesSettingTab: React.FC<ContextWorkspacesSettingTabPr
 							setSpaceOrder([...plugin.settings.spaceOrder]);
 						}}
 					>
-						New Space
+						New space
 					</button>
 				</div>
 
@@ -282,7 +287,7 @@ export const ContextWorkspacesSettingTab: React.FC<ContextWorkspacesSettingTabPr
 					})}
 				</div>
 
-				<h3>General Settings</h3>
+				<h3>General settings</h3>
 
 				<div className="obsidian-context-workspaces-setting-item">
 					<div className="obsidian-context-workspaces-setting-item-info">
@@ -297,7 +302,7 @@ export const ContextWorkspacesSettingTab: React.FC<ContextWorkspacesSettingTabPr
 							className="obsidian-context-workspaces-button obsidian-context-workspaces-cta"
 							onClick={() => setShowHelp(true)}
 						>
-							View Help
+							View help
 						</button>
 					</div>
 				</div>

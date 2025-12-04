@@ -83,6 +83,7 @@ export class SpaceManagerModal extends Modal {
 	onOpen() {
 		this.reactWrapper.open(
 			React.createElement(ReactSpaceManagerModal, {
+				app: this.app,
 				plugin: this.plugin,
 				isOpen: true,
 				onClose: () => this.close(),

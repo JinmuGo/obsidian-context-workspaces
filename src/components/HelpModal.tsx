@@ -25,27 +25,27 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
 			<div className="obsidian-context-workspaces-modal-content obsidian-context-workspaces-help-modal">
 				<div className="obsidian-context-workspaces-modal-body">
 					<div className="obsidian-context-workspaces-help-content">
-						<h3>Basic Usage</h3>
+						<h3>Basic usage</h3>
 						<p>• Click on space icons in the sidebar to switch between spaces</p>
 						<p>
-							• Use "Next Space" and "Previous Space" commands from the command
+							• Use "Next space" and "Previous space" commands from the command
 							palette
 						</p>
-						<p>• Use "Create New Space" command to create new workspaces</p>
+						<p>• Use "Create new space" command to create new workspaces</p>
 
-						<h3>Space Modes</h3>
+						<h3>Space modes</h3>
 						<p>
-							• Auto-save Mode (🔄): Automatically saves and restores state when
+							• Auto-save mode (🔄): Automatically saves and restores state when
 							switching spaces
 						</p>
 						<p>
-							• Snapshot Mode: Default Workspace behavior, manual save/load required
+							• Snapshot mode: Default Workspace behavior, manual save/load required
 						</p>
 
-						<h3>Keyboard Shortcuts</h3>
+						<h3>Keyboard shortcuts</h3>
 						<p>
 							Go to Settings {'>'} Hotkeys to assign keyboard shortcuts for "Next
-							Space" and "Previous Space" commands.
+							space" and "Previous space" commands.
 						</p>
 					</div>
 				</div>

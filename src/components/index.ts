@@ -1,3 +1,4 @@
+export { ConfirmModal } from './ConfirmModal';
 export { ContextWorkspacesSettingTab } from './ContextWorkspacesSettingTab';
 export { DndProvider } from './DndProvider';
 export { EmojiPicker } from './EmojiPicker';

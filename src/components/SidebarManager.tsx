@@ -68,7 +68,7 @@ const SpaceItem: React.FC<SpaceItemProps> = ({
 	};
 
 	// Handle double click for space switching (alternative to drag)
-	const handleDoubleClick = (_e: React.MouseEvent) => {
+	const handleDoubleClick = () => {
 		// Prevent double click if dragging
 		if (isDragging) {
 			return;
@@ -114,7 +114,6 @@ export const SidebarManager: React.FC<SidebarManagerProps> = ({ plugin }) => {
 	const [spaceOrder, setSpaceOrder] = useState(plugin.settings.spaceOrder);
 	const [currentSpaceId, setCurrentSpaceId] = useState(plugin.settings.currentSpaceId);
 	const [animationDirection, setAnimationDirection] = useState<'left' | 'right' | null>(null);
-	const [_centerIndex, setCenterIndex] = useState(0);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const isMountedRef = useRef(true);
 	const previousSpaceIdRef = useRef<string>(plugin.settings.currentSpaceId);
@@ -177,16 +176,6 @@ export const SidebarManager: React.FC<SidebarManagerProps> = ({ plugin }) => {
 		};
 	}, [plugin, spaces, spaceOrder, currentSpaceId]); // Include dependencies to ensure proper updates
 
-	// Auto-center the current space when it changes
-	useEffect(() => {
-		if (spaceOrder.length >= 5 && currentSpaceId) {
-			const currentIndex = spaceOrder.indexOf(currentSpaceId);
-			if (currentIndex !== -1) {
-				setCenterIndex(currentIndex);
-			}
-		}
-	}, [currentSpaceId, spaceOrder]);
-
 	const handleDragEnd = (event: {
 		active: { id: string | number };
 		over: { id: string | number } | null;
@@ -212,7 +201,7 @@ export const SidebarManager: React.FC<SidebarManagerProps> = ({ plugin }) => {
 
 				// Update plugin settings
 				plugin.settings.spaceOrder = newSpaceOrder;
-				plugin.saveSettings();
+				void plugin.saveSettings();
 
 				// Notify plugin about the order change
 				if (plugin.onSpaceOrderChanged) {
@@ -227,7 +216,7 @@ export const SidebarManager: React.FC<SidebarManagerProps> = ({ plugin }) => {
 		if (!isMountedRef.current) return;
 
 		// Call plugin method to switch space
-		plugin.switchToSpace(spaceId);
+		void plugin.switchToSpace(spaceId);
 
 		// Scroll to center the active space if using centered layout
 		if (shouldUseCenteredLayout) {
@@ -260,7 +249,7 @@ export const SidebarManager: React.FC<SidebarManagerProps> = ({ plugin }) => {
 		const currentIndex = spaceOrder.indexOf(currentSpaceId);
 		if (currentIndex > 0) {
 			const previousSpaceId = spaceOrder[currentIndex - 1];
-			plugin.switchToSpace(previousSpaceId);
+			void plugin.switchToSpace(previousSpaceId);
 		}
 	};
 
@@ -270,13 +259,13 @@ export const SidebarManager: React.FC<SidebarManagerProps> = ({ plugin }) => {
 		const currentIndex = spaceOrder.indexOf(currentSpaceId);
 		if (currentIndex < spaceOrder.length - 1) {
 			const nextSpaceId = spaceOrder[currentIndex + 1];
-			plugin.switchToSpace(nextSpaceId);
+			void plugin.switchToSpace(nextSpaceId);
 		}
 	};
 
 	const handleCreateNewSpace = () => {
 		if (!isMountedRef.current) return;
-		plugin.createNewSpace();
+		void plugin.createNewSpace();
 	};
 
 	// Check if we should use centered layout (5 or more spaces)
@@ -329,7 +318,8 @@ export const SidebarManager: React.FC<SidebarManagerProps> = ({ plugin }) => {
 							className="obsidian-context-workspaces-help-btn"
 							onClick={() => {
 								new Notice(
-									'💡 Tip: Double-click to switch spaces, Drag to reorder',
+									// eslint-disable-next-line obsidianmd/ui/sentence-case
+									'💡 Tip: Double-click to switch spaces, drag to reorder',
 									3000
 								);
 							}}
