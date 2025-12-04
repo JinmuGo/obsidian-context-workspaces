@@ -264,12 +264,16 @@ export class SidebarManager {
 	}
 
 	render() {
-		if (!this.container) return;
+		if (!this.container) {
+			this.ensureExists();
+			return;
+		}
 
 		try {
 			// 컨테이너가 DOM에 연결되어 있는지 확인
 			if (!this.container.isConnected) {
-				console.warn('Sidebar container is not connected to DOM, skipping render');
+				// 컨테이너가 연결되지 않았으면 재초기화 시도
+				this.ensureExists();
 				return;
 			}
 
