@@ -285,7 +285,11 @@ export const ContextWorkspacesSettingTab: React.FC<ContextWorkspacesSettingTabPr
 								spaceId={spaceId}
 								space={space}
 								isActive={spaceId === plugin.settings.currentSpaceId}
-								onToggleAutoSave={(spaceId: string) => void handleToggleAutoSave(spaceId)}
+								onToggleAutoSave={(spaceId: string) => {
+									handleToggleAutoSave(spaceId).catch(() => {
+										// Error handled by handleToggleAutoSave
+									});
+								}}
 								onEditSpace={handleEditSpace}
 								onDeleteSpace={handleDeleteSpace}
 							/>

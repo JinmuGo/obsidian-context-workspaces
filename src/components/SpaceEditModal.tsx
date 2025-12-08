@@ -167,9 +167,11 @@ export const SpaceEditModal: React.FC<SpaceEditModalProps> = ({
 		onClose();
 	};
 
-	const handleKeyDown = async (evt: React.KeyboardEvent) => {
+	const handleKeyDown = (evt: React.KeyboardEvent) => {
 		if (evt.key === 'Enter') {
-			void handleSave();
+			handleSave().catch(() => {
+				// Error handled by handleSave
+			});
 		} else if (evt.key === 'Escape') {
 			onClose();
 		}

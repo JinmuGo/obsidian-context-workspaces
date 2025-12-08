@@ -58,12 +58,14 @@ export function validateString(
 		return { isValid: false, errors };
 	}
 
-	if (rules.minLength !== undefined && value.length < rules.minLength) {
-		errors.push(`Minimum length is ${rules.minLength} characters`);
+	const minLength = rules.minLength;
+	if (minLength !== undefined && value.length < minLength) {
+		errors.push(`Minimum length is ${minLength} characters`);
 	}
 
-	if (rules.maxLength !== undefined && value.length > rules.maxLength) {
-		errors.push(`Maximum length is ${rules.maxLength} characters`);
+	const maxLength = rules.maxLength;
+	if (maxLength !== undefined && value.length > maxLength) {
+		errors.push(`Maximum length is ${maxLength} characters`);
 	}
 
 	if (rules.pattern && !rules.pattern.test(value)) {

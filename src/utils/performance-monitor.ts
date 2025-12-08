@@ -265,10 +265,13 @@ export class AsyncQueue {
 					await task();
 					resolve();
 				} catch (error) {
-					reject(error instanceof Error ? error : new Error(String(error)));
+					const errorObj = error instanceof Error ? error : new Error(String(error));
+					reject(errorObj);
 				}
 			});
-			void this.process();
+			this.process().catch(() => {
+				// Error handled by process method
+			});
 		});
 	}
 
@@ -283,12 +286,14 @@ export class AsyncQueue {
 		this.running++;
 		const task = this.queue.shift();
 		if (task) {
-		try {
-			await task();
-		} finally {
-			this.running--;
-			void this.process();
-		}
+			try {
+				await task();
+			} finally {
+				this.running--;
+				this.process().catch(() => {
+					// Error handled by process method
+				});
+			}
 		}
 	}
 
