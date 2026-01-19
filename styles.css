@@ -1625,6 +1625,144 @@ div[style*="max-width: 90vw"] .obsidian-context-workspaces-edit-modal,
 	background: var(--background-secondary-alt);
 }
 
+/* ===== VIEW MODE TOGGLE BUTTON ===== */
+
+.obsidian-context-workspaces-view-toggle-btn {
+	width: 20px;
+	height: 20px;
+	border-radius: 4px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--interactive-normal);
+	color: var(--text-normal);
+	cursor: pointer;
+	font-size: 12px;
+	font-weight: bold;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: var(--obsidian-context-workspaces-transition);
+	margin-right: 4px;
+}
+
+.obsidian-context-workspaces-view-toggle-btn:hover {
+	background: var(--interactive-hover);
+	transform: scale(1.1);
+	color: var(--text-accent);
+}
+
+/* ===== LIST VIEW STYLES ===== */
+
+.obsidian-context-workspaces-list-container {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	max-height: 300px;
+	overflow-y: auto;
+	overflow-x: hidden;
+	padding: 4px 0;
+	scrollbar-width: thin;
+	scrollbar-color: var(--background-modifier-border) transparent;
+}
+
+.obsidian-context-workspaces-list-container::-webkit-scrollbar {
+	width: 6px;
+}
+
+.obsidian-context-workspaces-list-container::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.obsidian-context-workspaces-list-container::-webkit-scrollbar-thumb {
+	background: var(--background-modifier-border);
+	border-radius: 3px;
+}
+
+.obsidian-context-workspaces-list-container::-webkit-scrollbar-thumb:hover {
+	background: var(--background-modifier-border-hover);
+}
+
+.obsidian-context-workspaces-list-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	border-radius: var(--obsidian-context-workspaces-border-radius);
+	cursor: pointer;
+	transition: var(--obsidian-context-workspaces-transition);
+	border: 1px solid transparent;
+	background: transparent;
+	width: 100%;
+	text-align: left;
+	position: relative;
+	user-select: none;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+}
+
+.obsidian-context-workspaces-list-item:hover {
+	background: var(--background-modifier-hover);
+	border-color: var(--background-modifier-border);
+}
+
+.obsidian-context-workspaces-list-item.active {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border-color: var(--interactive-accent);
+}
+
+.obsidian-context-workspaces-list-item.active:hover {
+	background: var(--interactive-accent-hover);
+}
+
+.obsidian-context-workspaces-list-item.obsidian-context-workspaces-dragging {
+	opacity: 0.5;
+	transform: rotate(2deg) scale(1.02);
+	z-index: 1000;
+	box-shadow: var(--obsidian-context-workspaces-shadow-hover);
+}
+
+.obsidian-context-workspaces-list-icon {
+	font-size: 16px;
+	line-height: 1;
+	flex-shrink: 0;
+	width: 24px;
+	height: 24px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: grab;
+}
+
+.obsidian-context-workspaces-list-icon:active {
+	cursor: grabbing;
+}
+
+.obsidian-context-workspaces-list-name {
+	flex: 1;
+	font-size: 13px;
+	font-weight: 500;
+	color: var(--text-normal);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.obsidian-context-workspaces-list-item.active .obsidian-context-workspaces-list-name {
+	color: var(--text-on-accent);
+}
+
+.obsidian-context-workspaces-list-auto-save {
+	color: var(--text-accent);
+	font-size: 8px;
+	flex-shrink: 0;
+}
+
+.obsidian-context-workspaces-list-item.active .obsidian-context-workspaces-list-auto-save {
+	color: var(--text-on-accent);
+	opacity: 0.8;
+}
+
 /* ===== ANIMATIONS ===== */
 
 .obsidian-context-workspaces-space-item {

@@ -3,7 +3,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Notice } from 'obsidian';
 import type React from 'react';
 import { Component, type ReactNode, useEffect, useRef, useState } from 'react';
-import type { ContextWorkspacesPlugin, SpaceConfig } from '../types';
+import type { ContextWorkspacesPlugin, SidebarViewMode, SpaceConfig } from '../types';
 import { DndProvider } from './DndProvider';
 
 // Error Boundary Component
@@ -105,6 +105,65 @@ const SpaceItem: React.FC<SpaceItemProps> = ({
 	);
 };
 
+// List view item component
+interface SpaceListItemProps {
+	spaceId: string;
+	space: SpaceConfig;
+	isActive: boolean;
+	onSwitchSpace: (spaceId: string) => void;
+}
+
+const SpaceListItem: React.FC<SpaceListItemProps> = ({
+	spaceId,
+	space,
+	isActive,
+	onSwitchSpace,
+}) => {
+	const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+		id: spaceId,
+	});
+
+	const style = {
+		transform: CSS.Transform.toString(transform),
+		transition,
+		opacity: isDragging ? 0.5 : 1,
+	};
+
+	const handleDoubleClick = () => {
+		if (isDragging) return;
+		onSwitchSpace(spaceId);
+	};
+
+	return (
+		<button
+			ref={setNodeRef}
+			style={style}
+			className={`obsidian-context-workspaces-list-item ${isActive ? 'active' : ''} ${isDragging ? 'obsidian-context-workspaces-dragging' : ''}`}
+			onDoubleClick={handleDoubleClick}
+			title={`${space.name} (Double-click to switch, Drag to reorder)`}
+			type="button"
+			onKeyDown={(e) => {
+				if (e.key === 'Enter' || e.key === ' ') {
+					e.preventDefault();
+					onSwitchSpace(spaceId);
+				}
+			}}
+			{...attributes}
+		>
+			{/* Drag handle + Icon */}
+			<div className="obsidian-context-workspaces-list-icon" {...listeners}>
+				{space.icon || '📄'}
+			</div>
+
+			{/* Space name */}
+			<span className="obsidian-context-workspaces-list-name">{space.name}</span>
+
+			{/* Auto-save indicator */}
+			{space.autoSave && <div className="obsidian-context-workspaces-list-auto-save">•</div>}
+		</button>
+	);
+};
+
 interface SidebarManagerProps {
 	plugin: ContextWorkspacesPlugin;
 }
@@ -114,6 +173,9 @@ export const SidebarManager: React.FC<SidebarManagerProps> = ({ plugin }) => {
 	const [spaceOrder, setSpaceOrder] = useState(plugin.settings.spaceOrder);
 	const [currentSpaceId, setCurrentSpaceId] = useState(plugin.settings.currentSpaceId);
 	const [animationDirection, setAnimationDirection] = useState<'left' | 'right' | null>(null);
+	const [viewMode, setViewMode] = useState<SidebarViewMode>(
+		plugin.settings.sidebarViewMode || 'icon'
+	);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const isMountedRef = useRef(true);
 	const previousSpaceIdRef = useRef<string>(plugin.settings.currentSpaceId);
@@ -268,6 +330,14 @@ export const SidebarManager: React.FC<SidebarManagerProps> = ({ plugin }) => {
 		void plugin.createNewSpace();
 	};
 
+	const handleToggleViewMode = () => {
+		if (!isMountedRef.current) return;
+		const newMode: SidebarViewMode = viewMode === 'icon' ? 'list' : 'icon';
+		setViewMode(newMode);
+		plugin.settings.sidebarViewMode = newMode;
+		void plugin.saveSettings();
+	};
+
 	// Check if we should use centered layout (5 or more spaces)
 	const shouldUseCenteredLayout = spaceOrder.length >= 5;
 
@@ -312,6 +382,16 @@ export const SidebarManager: React.FC<SidebarManagerProps> = ({ plugin }) => {
 					<div className="obsidian-context-workspaces-header">
 						<h4 className="obsidian-context-workspaces-title">Context Workspaces</h4>
 
+						{/* View mode toggle button */}
+						<button
+							type="button"
+							className="obsidian-context-workspaces-view-toggle-btn"
+							onClick={handleToggleViewMode}
+							title={viewMode === 'icon' ? 'Switch to list view' : 'Switch to icon view'}
+						>
+							{viewMode === 'icon' ? '≡' : '⊞'}
+						</button>
+
 						{/* Help button */}
 						<button
 							type="button"
@@ -337,52 +417,76 @@ export const SidebarManager: React.FC<SidebarManagerProps> = ({ plugin }) => {
 						</button>
 					</div>
 
-					{/* Carousel container */}
-					<div
-						className={`obsidian-context-workspaces-carousel-container ${shouldUseCenteredLayout ? 'centered-layout grid-carousel' : ''} ${animationDirection ? `animate-${animationDirection}` : ''}`}
-					>
-						{/* Left navigation button */}
-						<button
-							type="button"
-							className={`obsidian-context-workspaces-nav-btn left ${!canGoPrevious ? 'disabled' : ''}`}
-							onClick={handlePreviousSpace}
-							disabled={!canGoPrevious}
+					{/* View mode: Icon (Carousel) */}
+					{viewMode === 'icon' && (
+						<div
+							className={`obsidian-context-workspaces-carousel-container ${shouldUseCenteredLayout ? 'centered-layout grid-carousel' : ''} ${animationDirection ? `animate-${animationDirection}` : ''}`}
 						>
-							‹
-						</button>
+							{/* Left navigation button */}
+							<button
+								type="button"
+								className={`obsidian-context-workspaces-nav-btn left ${!canGoPrevious ? 'disabled' : ''}`}
+								onClick={handlePreviousSpace}
+								disabled={!canGoPrevious}
+							>
+								‹
+							</button>
 
-						{/* Spaces list (grid carousel container) */}
-						<div className="obsidian-context-workspaces-carousel">
-							{getVisibleSpaces().map((spaceId: string, index: number) => {
+							{/* Spaces list (grid carousel container) */}
+							<div className="obsidian-context-workspaces-carousel">
+								{getVisibleSpaces().map((spaceId: string, index: number) => {
+									const space = spaces[spaceId];
+									if (!space) return null;
+
+									const isActive = spaceId === currentSpaceId;
+									const isCenter = shouldUseCenteredLayout && index === 2; // Center position
+
+									return (
+										<SpaceItem
+											key={spaceId}
+											spaceId={spaceId}
+											space={space}
+											isActive={isActive}
+											isCenter={isCenter}
+											onSwitchSpace={handleSwitchSpace}
+										/>
+									);
+								})}
+							</div>
+
+							{/* Right navigation button */}
+							<button
+								type="button"
+								className={`obsidian-context-workspaces-nav-btn right ${!canGoNext ? 'disabled' : ''}`}
+								onClick={handleNextSpace}
+								disabled={!canGoNext}
+							>
+								›
+							</button>
+						</div>
+					)}
+
+					{/* View mode: List */}
+					{viewMode === 'list' && (
+						<div className="obsidian-context-workspaces-list-container">
+							{spaceOrder.map((spaceId: string) => {
 								const space = spaces[spaceId];
 								if (!space) return null;
 
 								const isActive = spaceId === currentSpaceId;
-								const isCenter = shouldUseCenteredLayout && index === 2; // Center position
 
 								return (
-									<SpaceItem
+									<SpaceListItem
 										key={spaceId}
 										spaceId={spaceId}
 										space={space}
 										isActive={isActive}
-										isCenter={isCenter}
 										onSwitchSpace={handleSwitchSpace}
 									/>
 								);
 							})}
 						</div>
-
-						{/* Right navigation button */}
-						<button
-							type="button"
-							className={`obsidian-context-workspaces-nav-btn right ${!canGoNext ? 'disabled' : ''}`}
-							onClick={handleNextSpace}
-							disabled={!canGoNext}
-						>
-							›
-						</button>
-					</div>
+					)}
 				</div>
 			</DndProvider>
 		</ErrorBoundary>

@@ -3,6 +3,9 @@
 // Theme mode type
 export type ThemeMode = 'light' | 'dark' | 'system';
 
+// Sidebar view mode type
+export type SidebarViewMode = 'icon' | 'list';
+
 // Emoji data interface
 export interface EmojiData {
 	native: string;
@@ -52,12 +55,14 @@ export interface ContextWorkspacesSettings {
 	spaceOrder: string[];
 	currentSpaceId: string;
 	workspaceLastSeen?: Record<string, number>; // Track when workspaces were last seen
+	sidebarViewMode?: SidebarViewMode; // Sidebar display mode: 'icon' or 'list'
 }
 
 export const DEFAULT_SETTINGS: ContextWorkspacesSettings = {
 	spaces: {},
 	currentSpaceId: '',
 	spaceOrder: [],
+	sidebarViewMode: 'icon',
 };
 
 // Plugin type for better type safety
