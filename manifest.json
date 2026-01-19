@@ -1,7 +1,7 @@
 {
 	"id": "context-workspaces",
 	"name": "Context Workspaces",
-	"version": "0.0.1",
+	"version": "0.1.0",
 	"minAppVersion": "0.15.0",
 	"description": "A workspace toolkit to build focused, clutter-free zones for every task.",
 	"author": "jinmugo",
