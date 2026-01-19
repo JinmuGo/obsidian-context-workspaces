@@ -322,6 +322,51 @@
 
 /* ===== SIDEBAR STYLES ===== */
 
+/* ===== VIEW CONTAINER STYLES (ItemView-based sidebar) ===== */
+
+/* View container - allows DnD repositioning in workspace-tab */
+.context-workspaces-view-container {
+	display: flex;
+	flex-direction: column;
+	padding: 0;
+	overflow: hidden;
+}
+
+/* View leaf styling */
+.workspace-leaf-content[data-type="context-workspaces-view"] {
+	padding: 0;
+	overflow: hidden;
+}
+
+.workspace-leaf-content[data-type="context-workspaces-view"] > .view-content {
+	padding: 6px 8px;
+	overflow-y: auto;
+	overflow-x: hidden;
+}
+
+/* ===== ICON MODE: Compact height (default Obsidian behavior) ===== */
+
+/* Sidebar in icon mode - use default compact sizing */
+.obsidian-context-workspaces-sidebar.view-mode-icon {
+	margin-top: 0;
+}
+
+/* ===== LIST MODE: Expand to fill available space ===== */
+
+/* Workspace leaf in list mode - expand */
+.workspace-leaf.cw-view-mode-list {
+	flex: 1 1 auto !important;
+	min-height: 200px !important;
+}
+
+/* Sidebar in list mode - expand to fill */
+.obsidian-context-workspaces-sidebar.view-mode-list {
+	height: 100%;
+	min-height: 150px;
+	flex: 1;
+	margin-top: 0;
+}
+
 /* Use Obsidian's existing sidebar classes where possible */
 .workspace-leaf-content[data-type="context-workspaces"] .workspace-leaf-content {
 	padding: 6px 8px;

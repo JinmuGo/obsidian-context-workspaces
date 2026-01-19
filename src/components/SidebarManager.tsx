@@ -187,6 +187,29 @@ export const SidebarManager: React.FC<SidebarManagerProps> = ({ plugin }) => {
 		};
 	}, []);
 
+	// Dynamically adjust parent container height based on view mode using CSS classes
+	useEffect(() => {
+		if (!containerRef.current) return;
+
+		// Find the workspace-leaf parent
+		const workspaceLeaf = containerRef.current.closest('.workspace-leaf') as HTMLElement;
+
+		if (!workspaceLeaf) return;
+
+		// Only apply special class for list mode (to expand)
+		// Icon mode uses default Obsidian behavior which is compact
+		if (viewMode === 'list') {
+			workspaceLeaf.classList.add('cw-view-mode-list');
+		} else {
+			workspaceLeaf.classList.remove('cw-view-mode-list');
+		}
+
+		// Cleanup function to remove classes on unmount
+		return () => {
+			workspaceLeaf?.classList.remove('cw-view-mode-list');
+		};
+	}, [viewMode]);
+
 	// Update state when plugin settings change
 	useEffect(() => {
 		const updateState = () => {
@@ -377,7 +400,10 @@ export const SidebarManager: React.FC<SidebarManagerProps> = ({ plugin }) => {
 	return (
 		<ErrorBoundary>
 			<DndProvider onDragEnd={handleDragEnd} items={spaceOrder}>
-				<div ref={containerRef} className="obsidian-context-workspaces-sidebar">
+				<div
+					ref={containerRef}
+					className={`obsidian-context-workspaces-sidebar view-mode-${viewMode}`}
+				>
 					{/* Header */}
 					<div className="obsidian-context-workspaces-header">
 						<h4 className="obsidian-context-workspaces-title">Context Workspaces</h4>

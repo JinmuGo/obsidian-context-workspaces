@@ -25,15 +25,17 @@ import {
 } from './utils/space-utils';
 import { needsSync, safeBidirectionalSync } from './utils/sync-utils';
 import {
+	ContextWorkspacesView,
+	VIEW_TYPE_CONTEXT_WORKSPACES,
+} from './views/ContextWorkspacesView';
+import {
 	ContextWorkspacesSettingTab,
-	SidebarManager,
 	SpaceCreateModal,
 	SpaceManagerModal,
 } from './wrappers';
 
 export default class ContextWorkspacesPlugin extends Plugin {
 	settings: ContextWorkspacesSettings;
-	sidebarManager: SidebarManager;
 	layoutChangeTimeout: NodeJS.Timeout;
 	workspaceChangeTimeout: NodeJS.Timeout;
 	switchingToSpaceId: string | null = null;
@@ -41,18 +43,25 @@ export default class ContextWorkspacesPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 
-		// Initialize sidebar manager
-		this.sidebarManager = new SidebarManager(this);
-		this.sidebarManager.initialize();
+		// Register the custom view
+		this.registerView(VIEW_TYPE_CONTEXT_WORKSPACES, (leaf) => {
+			return new ContextWorkspacesView(leaf, this);
+		});
+
+		// Activate view when layout is ready
+		this.app.workspace.onLayoutReady(() => {
+			void this.activateView();
+		});
+
+		// Add ribbon icon for quick toggle
+		this.addRibbonIcon('layout-grid', 'Context workspaces', () => {
+			void this.activateView();
+		});
 
 		// Register workspace event listeners
 		this.registerEvent(
 			this.app.workspace.on('layout-change', () => {
 				this.handleLayoutChange();
-				// Ensure sidebar exists after layout changes with debouncing
-				setTimeout(() => {
-					this.sidebarManager.ensureExists();
-				}, 100); // Increased delay to prevent rapid reinitialization
 			})
 		);
 
@@ -151,11 +160,43 @@ export default class ContextWorkspacesPlugin extends Plugin {
 
 		// Remove workspace load monitoring
 		removeWorkspaceLoadMonitoring(this.app);
+	}
 
-		// Cleanup sidebar manager
-		if (this.sidebarManager) {
-			this.sidebarManager.destroy();
+	/**
+	 * Activate the Context Workspaces view in the sidebar
+	 */
+	async activateView(): Promise<void> {
+		const { workspace } = this.app;
+
+		// Check if view is already open
+		let leaf = workspace.getLeavesOfType(VIEW_TYPE_CONTEXT_WORKSPACES)[0];
+
+		if (!leaf) {
+			// Create new leaf in left sidebar
+			const leftLeaf = workspace.getLeftLeaf(false);
+			if (leftLeaf) {
+				await leftLeaf.setViewState({
+					type: VIEW_TYPE_CONTEXT_WORKSPACES,
+					active: true,
+				});
+				leaf = leftLeaf;
+			}
 		}
+
+		if (leaf) {
+			workspace.revealLeaf(leaf);
+		}
+	}
+
+	/**
+	 * Get the active Context Workspaces view instance
+	 */
+	getView(): ContextWorkspacesView | null {
+		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CONTEXT_WORKSPACES);
+		if (leaves.length > 0) {
+			return leaves[0].view as ContextWorkspacesView;
+		}
+		return null;
 	}
 
 	async loadSettings() {
@@ -245,7 +286,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 			// Update sidebar safely with delay to ensure state is stable
 			setTimeout(() => {
 				try {
-					this.sidebarManager.render();
+					this.getView()?.render();
 				} catch (error) {
 					console.error('Failed to update sidebar:', error);
 				}
@@ -277,7 +318,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		// Update sidebar to reflect the new order safely with delay
 		setTimeout(() => {
 			try {
-				this.sidebarManager.render();
+				this.getView()?.render();
 			} catch (error) {
 				console.error('Failed to update sidebar after order change:', error);
 			}
@@ -366,7 +407,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		// Update sidebar safely with delay
 		setTimeout(() => {
 			try {
-				this.sidebarManager.render();
+				this.getView()?.render();
 			} catch (error) {
 				console.error('Failed to update sidebar after space creation:', error);
 			}
@@ -425,7 +466,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		// Update sidebar safely with delay
 		setTimeout(() => {
 			try {
-				this.sidebarManager.render();
+				this.getView()?.render();
 			} catch (error) {
 				console.error('Failed to update sidebar after space deletion:', error);
 			}
@@ -458,7 +499,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 	updateSidebarSpaces() {
 		setTimeout(() => {
 			try {
-				this.sidebarManager.render();
+				this.getView()?.render();
 			} catch (error) {
 				console.error('Failed to update sidebar spaces:', error);
 			}
@@ -468,7 +509,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 	updateSidebarSpacesOptimized() {
 		setTimeout(() => {
 			try {
-				this.sidebarManager.render();
+				this.getView()?.render();
 			} catch (error) {
 				console.error('Failed to update sidebar spaces optimized:', error);
 			}
@@ -671,7 +712,6 @@ export default class ContextWorkspacesPlugin extends Plugin {
 					try {
 						await this.saveSettings();
 						this.updateSidebarSpaces();
-						this.sidebarManager.ensureExists();
 
 						// Show notification only for significant changes
 						if (currentWorkspaceDeleted) {
