@@ -1,10 +1,11 @@
 {
-	"id": "context-workspaces",
-	"name": "Context Workspaces",
-	"version": "0.1.1",
-	"minAppVersion": "0.15.0",
-	"description": "A workspace toolkit to build focused, clutter-free zones for every task.",
-	"author": "jinmugo",
-	"authorUrl": "https://github.com/jinmugo",
-	"isDesktopOnly": false
+  "id": "context-workspaces",
+  "name": "Context Workspaces",
+  "version": "0.1.1",
+  "minAppVersion": "0.15.0",
+  "description": "A workspace toolkit to build focused, clutter-free zones for every task.",
+  "author": "Jinmu Go",
+  "authorUrl": "https://github.com/JinmuGo",
+  "fundingUrl": "https://github.com/sponsors/JinmuGo",
+  "isDesktopOnly": false
 }
