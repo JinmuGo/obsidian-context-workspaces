@@ -11,7 +11,7 @@ export default tseslint.config(
     files: ['src/**/*.{ts,tsx}'],
     extends: [
       js.configs.recommended,
-      ...tseslint.configs.recommended,
+      ...tseslint.configs.recommendedTypeChecked,
     ],
     languageOptions: {
       ecmaVersion: 2020,
@@ -39,6 +39,7 @@ export default tseslint.config(
       ],
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/ban-ts-comment': 'warn',
+      '@typescript-eslint/require-await': 'off',
     },
     settings: {
       react: {

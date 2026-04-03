@@ -1,3 +1,56 @@
+// ===== Obsidian Internal API Type Definitions =====
+
+/**
+ * Obsidian's internal customCss interface (not officially documented)
+ */
+export interface ObsidianCustomCss {
+	theme?: string;
+	themes?: Record<string, unknown>;
+	setTheme?: (themeName: string) => void;
+}
+
+/**
+ * Obsidian's internal theme plugin instance interface
+ */
+export interface ObsidianThemePluginInstance {
+	setTheme?: (themeName: string) => void;
+	setThemeMode?: (mode: string) => void;
+}
+
+/**
+ * Obsidian's internal plugins interface
+ */
+export interface ObsidianInternalPlugins {
+	plugins: {
+		workspaces?: {
+			enabled?: boolean;
+			instance?: WorkspacesInstance;
+		};
+		theme?: {
+			instance?: ObsidianThemePluginInstance;
+		};
+	};
+}
+
+/**
+ * Extended App interface for accessing Obsidian internal APIs
+ */
+export interface ObsidianAppInternal {
+	customCss?: ObsidianCustomCss;
+	internalPlugins: ObsidianInternalPlugins;
+	workspace: {
+		trigger?: (event: string) => void;
+	};
+	vault: {
+		config?: {
+			theme?: string;
+			themeMode?: string;
+			themes?: Record<string, unknown>;
+		};
+		saveConfig?: () => Promise<void>;
+	};
+}
+
 // ===== Common Type Definitions =====
 
 // Theme mode type

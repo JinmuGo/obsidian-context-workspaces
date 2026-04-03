@@ -189,8 +189,8 @@ export function measurePerformance(name: string) {
 				throw new Error('Original method is undefined');
 			}
 			return performanceMonitor.measure(`${name}.${propertyKey}`, () =>
-				originalMethod.apply(this, args)
-			);
+				originalMethod.apply(this, args) as ReturnType<T>
+			) as ReturnType<T>;
 		} as T;
 		return descriptor;
 	};

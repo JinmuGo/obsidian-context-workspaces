@@ -184,7 +184,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		}
 
 		if (leaf) {
-			workspace.revealLeaf(leaf);
+			await workspace.revealLeaf(leaf);
 		}
 	}
 
@@ -200,7 +200,11 @@ export default class ContextWorkspacesPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		this.settings = Object.assign(
+			{},
+			DEFAULT_SETTINGS,
+			(await this.loadData()) as Partial<ContextWorkspacesSettings> | null,
+		);
 	}
 
 	async saveSettings() {
@@ -795,14 +799,12 @@ export default class ContextWorkspacesPlugin extends Plugin {
 
 		// Set up periodic sync (every 30 seconds) only if sync is needed
 		setInterval(() => {
-			void (async () => {
-				if (
-					needsSync(this.app, this.settings) ||
-					needsDeletionDetection(this.app, this.settings)
-				) {
-					this.handleWorkspaceChange();
-				}
-			})();
+			if (
+				needsSync(this.app, this.settings) ||
+				needsDeletionDetection(this.app, this.settings)
+			) {
+				this.handleWorkspaceChange();
+			}
 		}, 30000);
 	}
 }

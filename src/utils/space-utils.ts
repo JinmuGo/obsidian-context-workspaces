@@ -39,13 +39,19 @@ export function parseSpaceData(input: string): {
 	themeMode?: ThemeMode;
 } {
 	try {
-		const parsed = JSON.parse(input);
+		const parsed = JSON.parse(input) as {
+			name: string;
+			icon: string;
+			description?: string;
+			theme?: string;
+			themeMode?: ThemeMode;
+		};
 		return {
 			name: parsed.name,
 			icon: parsed.icon,
 			description: parsed.description,
 			theme: (parsed.theme ?? '').trim() || undefined,
-			themeMode: parsed.themeMode as ThemeMode | undefined,
+			themeMode: parsed.themeMode,
 		};
 	} catch {
 		// Legacy format compatibility

@@ -1,19 +1,26 @@
 import type { App } from 'obsidian';
 import type {
 	ContextWorkspacesPluginLike,
+	ObsidianAppInternal,
 	ThemeMode,
 	WorkspacesInstance,
 } from '../types';
 
 /**
+ * Cast App to internal API type for accessing undocumented Obsidian APIs
+ */
+function asInternal(app: App): ObsidianAppInternal {
+	return app as unknown as ObsidianAppInternal;
+}
+
+/**
  * Get Obsidian's internal workspaces plugin
  */
-export function getWorkspacesPlugin(app: App) {
-	// @ts-expect-error - Obsidian 내부 API 접근
-	return app.internalPlugins.plugins.workspaces as {
-		enabled?: boolean;
-		instance?: WorkspacesInstance;
-	};
+export function getWorkspacesPlugin(app: App): {
+	enabled?: boolean;
+	instance?: WorkspacesInstance;
+} | undefined {
+	return asInternal(app).internalPlugins.plugins.workspaces;
 }
 
 /**
@@ -199,17 +206,16 @@ export function workspaceExistsInObsidian(app: App, workspaceId: string): boolea
  */
 export function getAvailableThemes(app: App): string[] {
 	try {
-		// Try multiple methods to get available themes
+		const internal = asInternal(app);
+
 		// Method 1: Direct customCss access
-		// @ts-expect-error - Obsidian internal API access
-		const customCss = app.customCss;
+		const customCss = internal.customCss;
 		if (customCss?.themes) {
 			return Object.keys(customCss.themes).sort();
 		}
 
 		// Method 2: Check vault config
-		// @ts-expect-error - Obsidian internal API access
-		const vaultConfig = app.vault.config;
+		const vaultConfig = internal.vault.config;
 		if (vaultConfig?.themes) {
 			return Object.keys(vaultConfig.themes).sort();
 		}
@@ -229,7 +235,6 @@ export function getAvailableThemes(app: App): string[] {
 		return commonThemes;
 	} catch (error) {
 		console.error('Failed to get available themes:', error);
-		// Return default themes as fallback
 		return ['obsidian', 'dark', 'light'];
 	}
 }
@@ -239,16 +244,16 @@ export function getAvailableThemes(app: App): string[] {
  */
 export function getCurrentTheme(app: App): string {
 	try {
+		const internal = asInternal(app);
+
 		// Method 1: Direct customCss access
-		// @ts-expect-error - Obsidian internal API access
-		const customCss = app.customCss;
+		const customCss = internal.customCss;
 		if (customCss?.theme) {
 			return customCss.theme;
 		}
 
 		// Method 2: Check vault config
-		// @ts-expect-error - Obsidian internal API access
-		const vaultConfig = app.vault.config;
+		const vaultConfig = internal.vault.config;
 		if (vaultConfig?.theme) {
 			return vaultConfig.theme;
 		}
@@ -274,44 +279,43 @@ export function getCurrentTheme(app: App): string {
  */
 export async function setTheme(app: App, themeName: string): Promise<void> {
 	try {
+		const internal = asInternal(app);
+
 		// Method 1: Use customCss.setTheme if available (safest method)
-		// @ts-expect-error - Obsidian internal API access
-		const customCss = app.customCss;
-		if (customCss?.setTheme && typeof customCss.setTheme === 'function') {
+		const customCss = internal.customCss;
+		if (customCss?.setTheme) {
 			customCss.setTheme(themeName);
 			return;
 		}
 
 		// Method 2: Use Obsidian's built-in theme switching if available
-		// @ts-expect-error - Obsidian internal API access
-		if (app.internalPlugins?.plugins?.theme?.instance?.setTheme) {
-			// @ts-expect-error - Obsidian internal API access
-			app.internalPlugins.plugins.theme.instance.setTheme(themeName);
+		const themePlugin = internal.internalPlugins.plugins.theme;
+		if (themePlugin?.instance?.setTheme) {
+			themePlugin.instance.setTheme(themeName);
 			return;
 		}
 
 		// Method 3: Update vault config directly (with safety checks)
-		const vaultConfig = (app.vault as { config?: { theme?: string } }).config;
+		const vaultConfig = internal.vault.config;
 		if (vaultConfig) {
 			// Only change if the theme is actually different
 			if (vaultConfig.theme !== themeName) {
 				vaultConfig.theme = themeName;
-				await (app.vault as unknown as { saveConfig(): Promise<void> }).saveConfig();
+				if (internal.vault.saveConfig) {
+					await internal.vault.saveConfig();
+				}
 
 				// Trigger theme change event
-				const workspace = app.workspace as { trigger?: (event: string) => void };
+				const workspace = internal.workspace;
 				if (workspace.trigger) {
 					workspace.trigger('css-change');
 				}
 
-				
 				// Force Obsidian to refresh the theme immediately
 				setTimeout(() => {
-					// Trigger additional events to ensure theme is applied
 					const event = new CustomEvent('theme-change', { detail: { theme: themeName } });
 					document.dispatchEvent(event);
-					
-					// Force a re-render of the workspace
+
 					if (workspace.trigger) {
 						workspace.trigger('resize');
 					}
@@ -345,7 +349,7 @@ export function getCurrentThemeMode(app: App): ThemeMode {
 
 		// If no explicit classes, check if it's system mode
 		// Check config first
-		const configMode = (app.vault as { config?: { themeMode?: string } }).config?.themeMode;
+		const configMode = asInternal(app).vault.config?.themeMode;
 		if (configMode === 'light' || configMode === 'dark') {
 			return configMode;
 		}
@@ -386,11 +390,12 @@ export async function setThemeMode(app: App, mode: ThemeMode): Promise<void> {
 			return;
 		}
 
+		const internal = asInternal(app);
+
 		// Use Obsidian's built-in theme mode switching if available
-		// @ts-expect-error - Obsidian internal API access
-		if (app.internalPlugins?.plugins?.theme?.instance?.setThemeMode) {
-			// @ts-expect-error - Obsidian internal API access
-			app.internalPlugins.plugins.theme.instance.setThemeMode(mode);
+		const themePlugin = internal.internalPlugins.plugins.theme;
+		if (themePlugin?.instance?.setThemeMode) {
+			themePlugin.instance.setThemeMode(mode);
 			return;
 		}
 
@@ -415,28 +420,28 @@ export async function setThemeMode(app: App, mode: ThemeMode): Promise<void> {
 		}
 
 		// Update config for persistence
-		const vaultConfig = (app.vault as { config?: { themeMode?: string } }).config;
+		const vaultConfig = internal.vault.config;
 		if (vaultConfig) {
 			vaultConfig.themeMode = mode;
-			await (app.vault as unknown as { saveConfig(): Promise<void> }).saveConfig();
+			if (internal.vault.saveConfig) {
+				await internal.vault.saveConfig();
+			}
 		}
 
 		// Trigger theme change events
-		const workspace = app.workspace as { trigger?: (event: string) => void };
+		const workspace = internal.workspace;
 		if (workspace.trigger) {
 			workspace.trigger('css-change');
 		}
 
 		// Dispatch custom event for theme mode change
 		window.dispatchEvent(new CustomEvent('theme-mode-change', { detail: { mode } }));
-		
+
 		// Force Obsidian to refresh the theme mode immediately
 		setTimeout(() => {
-			// Trigger additional events to ensure theme mode is applied
 			const event = new CustomEvent('theme-change', { detail: { mode } });
 			document.dispatchEvent(event);
-			
-			// Force a re-render of the workspace
+
 			if (workspace.trigger) {
 				workspace.trigger('resize');
 			}
@@ -498,39 +503,37 @@ export function applySpaceTheme(
  */
 function setThemeTemporarily(app: App, themeName: string): void {
 	try {
+		const internal = asInternal(app);
+
 		// Method 1: Use customCss.setTheme if available (safest method)
-		// @ts-expect-error - Obsidian internal API access
-		const customCss = app.customCss;
-		if (customCss?.setTheme && typeof customCss.setTheme === 'function') {
+		const customCss = internal.customCss;
+		if (customCss?.setTheme) {
 			customCss.setTheme(themeName);
 			return;
 		}
 
 		// Method 2: Use Obsidian's built-in theme switching if available
-		// @ts-expect-error - Obsidian internal API access
-		if (app.internalPlugins?.plugins?.theme?.instance?.setTheme) {
-			// @ts-expect-error - Obsidian internal API access
-			app.internalPlugins.plugins.theme.instance.setTheme(themeName);
+		const themePlugin = internal.internalPlugins.plugins.theme;
+		if (themePlugin?.instance?.setTheme) {
+			themePlugin.instance.setTheme(themeName);
 			return;
 		}
 
 		// Method 3: Apply theme without saving to config (temporary change)
-		if (customCss?.theme) {
+		if (customCss) {
 			customCss.theme = themeName;
-			
+
 			// Trigger theme change event without saving config
-			const workspace = app.workspace as { trigger?: (event: string) => void };
+			const workspace = internal.workspace;
 			if (workspace.trigger) {
 				workspace.trigger('css-change');
 			}
 
 			// Force Obsidian to refresh the theme immediately
 			setTimeout(() => {
-				// Trigger additional events to ensure theme is applied
 				const event = new CustomEvent('theme-change', { detail: { theme: themeName } });
 				document.dispatchEvent(event);
-				
-				// Force a re-render of the workspace
+
 				if (workspace.trigger) {
 					workspace.trigger('resize');
 				}
@@ -538,7 +541,7 @@ function setThemeTemporarily(app: App, themeName: string): void {
 			return;
 		}
 
-		// Method 4: Fallback - try to reload the page theme
+		// Method 4: Fallback
 		console.warn('Using fallback temporary theme setting method');
 		throw new Error('Unable to set theme temporarily - no supported method available');
 	} catch (error) {
@@ -560,11 +563,12 @@ function setThemeModeTemporarily(app: App, mode: ThemeMode): void {
 			return;
 		}
 
+		const internal = asInternal(app);
+
 		// Use Obsidian's built-in theme mode switching if available
-		// @ts-expect-error - Obsidian internal API access
-		if (app.internalPlugins?.plugins?.theme?.instance?.setThemeMode) {
-			// @ts-expect-error - Obsidian internal API access
-			app.internalPlugins.plugins.theme.instance.setThemeMode(mode);
+		const themePlugin = internal.internalPlugins.plugins.theme;
+		if (themePlugin?.instance?.setThemeMode) {
+			themePlugin.instance.setThemeMode(mode);
 			return;
 		}
 
@@ -576,10 +580,8 @@ function setThemeModeTemporarily(app: App, mode: ThemeMode): void {
 			body.classList.remove('theme-dark');
 			body.classList.add('theme-light');
 		} else if (mode === 'system') {
-			// system mode - Remove both classes and apply system preference
 			body.classList.remove('theme-dark', 'theme-light');
 
-			// Apply system preference
 			const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
 			if (isDarkMode) {
 				body.classList.add('theme-dark');
@@ -589,21 +591,17 @@ function setThemeModeTemporarily(app: App, mode: ThemeMode): void {
 		}
 
 		// Trigger theme change events without saving config
-		const workspace = app.workspace as { trigger?: (event: string) => void };
+		const workspace = internal.workspace;
 		if (workspace.trigger) {
 			workspace.trigger('css-change');
 		}
 
-		// Dispatch custom event for theme mode change
 		window.dispatchEvent(new CustomEvent('theme-mode-change', { detail: { mode } }));
-		
-		// Force Obsidian to refresh the theme mode immediately
+
 		setTimeout(() => {
-			// Trigger additional events to ensure theme mode is applied
 			const event = new CustomEvent('theme-change', { detail: { mode } });
 			document.dispatchEvent(event);
-			
-			// Force a re-render of the workspace
+
 			if (workspace.trigger) {
 				workspace.trigger('resize');
 			}
@@ -634,7 +632,9 @@ export function setupWorkspaceLoadMonitoring(app: App, plugin: ContextWorkspaces
 		}
 
 		// Store original loadWorkspace method
-		const originalLoadWorkspace = workspaces.instance.loadWorkspace.bind(workspaces.instance);
+		const originalLoadWorkspace = workspaces.instance.loadWorkspace.bind(
+			workspaces.instance,
+		) as (id: string) => Promise<void>;
 		workspaces.instance._originalLoadWorkspace = originalLoadWorkspace;
 
 		// Override loadWorkspace method to detect calls
