@@ -34,7 +34,7 @@ export class ContextWorkspacesView extends ItemView {
 
 	async onOpen(): Promise<void> {
 		const container = this.containerEl.children[1];
-		if (container instanceof HTMLElement) {
+		if (container.instanceOf(HTMLElement)) {
 			container.empty();
 			container.addClass('context-workspaces-view-container');
 
@@ -56,7 +56,7 @@ export class ContextWorkspacesView extends ItemView {
 	 */
 	render(): void {
 		const container = this.containerEl.children[1];
-		if (container instanceof HTMLElement && this.reactWrapper.isConnected()) {
+		if (container.instanceOf(HTMLElement) && this.reactWrapper.isConnected()) {
 			this.reactWrapper.update(
 				React.createElement(ReactSidebarManager, { plugin: this.plugin })
 			);

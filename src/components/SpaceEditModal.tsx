@@ -78,8 +78,8 @@ export const SpaceEditModal: React.FC<SpaceEditModalProps> = ({
 			}
 		};
 
-		document.addEventListener('mousedown', handleClickOutside);
-		return () => document.removeEventListener('mousedown', handleClickOutside);
+		activeDocument.addEventListener('mousedown', handleClickOutside);
+		return () => activeDocument.removeEventListener('mousedown', handleClickOutside);
 	}, []);
 
 	const handleSave = async () => {
@@ -140,7 +140,7 @@ export const SpaceEditModal: React.FC<SpaceEditModalProps> = ({
 					);
 					
 					// Force CSS refresh and UI update
-					setTimeout(() => {
+					activeWindow.setTimeout(() => {
 						// Trigger CSS change event
 						const workspace = (plugin.app as App).workspace as { trigger?: (event: string) => void };
 						if (workspace.trigger) {
@@ -149,7 +149,7 @@ export const SpaceEditModal: React.FC<SpaceEditModalProps> = ({
 
 						// Force Obsidian to refresh the theme
 						const event = new CustomEvent('theme-change', { detail: { theme: updatedSpace.theme, mode: updatedSpace.themeMode } });
-						document.dispatchEvent(event);
+						activeDocument.dispatchEvent(event);
 					}, 100);
 				} catch (error) {
 					console.error('Failed to apply theme changes:', error);

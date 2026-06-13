@@ -55,7 +55,7 @@ export function getMemoryInfo(): MemoryInfo | null {
  */
 export class MemoryMonitor {
 	private memoryThreshold = 0.8; // 80% threshold
-	private checkInterval: NodeJS.Timeout | null = null;
+	private checkInterval: number | null = null;
 	private isMonitoring = false;
 
 	startMonitoring(intervalMs = 30000): void {
@@ -64,14 +64,14 @@ export class MemoryMonitor {
 		}
 
 		this.isMonitoring = true;
-		this.checkInterval = setInterval(() => {
+		this.checkInterval = activeWindow.setInterval(() => {
 			this.checkMemoryUsage();
 		}, intervalMs);
 	}
 
 	stopMonitoring(): void {
 		if (this.checkInterval) {
-			clearInterval(this.checkInterval);
+			activeWindow.clearInterval(this.checkInterval);
 			this.checkInterval = null;
 		}
 		this.isMonitoring = false;
@@ -180,10 +180,10 @@ export class EventListenerManager {
  * Timer manager
  */
 export class TimerManager {
-	private timers: Array<{ id: NodeJS.Timeout; description: string }> = [];
+	private timers: Array<{ id: number; description: string }> = [];
 
-	setTimeout(callback: () => void, delay: number, description = 'Unknown'): NodeJS.Timeout {
-		const id = setTimeout(() => {
+	setTimeout(callback: () => void, delay: number, description = 'Unknown'): number {
+		const id = activeWindow.setTimeout(() => {
 			callback();
 			this.removeTimer(id);
 		}, delay);
@@ -191,23 +191,23 @@ export class TimerManager {
 		return id;
 	}
 
-	setInterval(callback: () => void, delay: number, description = 'Unknown'): NodeJS.Timeout {
-		const id = setInterval(callback, delay);
+	setInterval(callback: () => void, delay: number, description = 'Unknown'): number {
+		const id = activeWindow.setInterval(callback, delay);
 		this.timers.push({ id, description });
 		return id;
 	}
 
-	clearTimeout(id: NodeJS.Timeout): void {
-		clearTimeout(id);
+	clearTimeout(id: number): void {
+		activeWindow.clearTimeout(id);
 		this.removeTimer(id);
 	}
 
-	clearInterval(id: NodeJS.Timeout): void {
-		clearInterval(id);
+	clearInterval(id: number): void {
+		activeWindow.clearInterval(id);
 		this.removeTimer(id);
 	}
 
-	private removeTimer(id: NodeJS.Timeout): void {
+	private removeTimer(id: number): void {
 		const index = this.timers.findIndex((t) => t.id === id);
 		if (index !== -1) {
 			this.timers.splice(index, 1);
@@ -216,8 +216,8 @@ export class TimerManager {
 
 	cleanup(): void {
 		this.timers.forEach(({ id }) => {
-			clearTimeout(id);
-			clearInterval(id);
+			activeWindow.clearTimeout(id);
+			activeWindow.clearInterval(id);
 		});
 		this.timers = [];
 	}

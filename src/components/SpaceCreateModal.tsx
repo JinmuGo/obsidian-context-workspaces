@@ -150,12 +150,12 @@ export class SpaceCreateModal extends Modal {
 		});
 
 		// Focus on name input
-		setTimeout(() => {
+		activeWindow.setTimeout(() => {
 			this.nameInput.focus();
 		}, 100);
 
 		// Click outside emoji picker to close
-		document.addEventListener('mousedown', this.handleClickOutside);
+		activeDocument.addEventListener('mousedown', this.handleClickOutside);
 
 		// Obsidian default modal button setup - manually added
 		const buttonContainer = contentEl.createDiv(
@@ -176,7 +176,7 @@ export class SpaceCreateModal extends Modal {
 	}
 
 	onClose() {
-		document.removeEventListener('mousedown', this.handleClickOutside);
+		activeDocument.removeEventListener('mousedown', this.handleClickOutside);
 		if (this.emojiPickerContainer) {
 			this.emojiPickerContainer.remove();
 			this.emojiPickerContainer = null;

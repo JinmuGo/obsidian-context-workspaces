@@ -201,7 +201,7 @@ export function sanitizeSpaceName(name: string): string {
  * Escape HTML characters
  */
 export function escapeHtml(text: string): string {
-	const div = document.createElement('div');
+	const div = createDiv();
 	div.textContent = text;
 	return div.textContent || '';
 }
