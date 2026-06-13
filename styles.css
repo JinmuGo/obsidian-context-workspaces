@@ -53,13 +53,13 @@
 }
 
 .obsidian-context-workspaces-settings h2 {
-	margin: 0 0 20px 0;
+	margin: 0 0 20px;
 	font-size: 20px;
 	font-weight: 600;
 }
 
 .obsidian-context-workspaces-settings h3 {
-	margin: 20px 0 10px 0;
+	margin: 20px 0 10px;
 	font-size: 16px;
 	font-weight: 600;
 }
@@ -68,7 +68,7 @@
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	margin: 20px 0 10px 0;
+	margin: 20px 0 10px;
 }
 
 .obsidian-context-workspaces-settings-header h3 {
@@ -354,9 +354,9 @@
 /* ===== LIST MODE: Expand to fill available space ===== */
 
 /* Workspace leaf in list mode - expand */
-.workspace-leaf.cw-view-mode-list {
-	flex: 1 1 auto !important;
-	min-height: 200px !important;
+.workspace-leaf.workspace-leaf.cw-view-mode-list {
+	flex: 1 1 auto;
+	min-height: 200px;
 }
 
 /* Sidebar in list mode - expand to fill */
@@ -373,19 +373,19 @@
 }
 
 /* Ensure sidebar works correctly in horizontal splits */
-.workspace-split.mod-horizontal .obsidian-context-workspaces-sidebar {
-	flex: 0 0 auto !important;
-	width: auto !important;
-	height: auto !important;
-	min-height: auto !important;
+.workspace-split.mod-horizontal .workspace-leaf-content[data-type="context-workspaces-view"] .obsidian-context-workspaces-sidebar {
+	flex: 0 0 auto;
+	width: auto;
+	height: auto;
+	min-height: auto;
 }
 
 /* Ensure sidebar works correctly in vertical splits */
-.workspace-split.mod-vertical .obsidian-context-workspaces-sidebar {
-	flex: 0 0 auto !important;
-	width: 100% !important;
-	height: auto !important;
-	min-height: auto !important;
+.workspace-split.mod-vertical .workspace-leaf-content[data-type="context-workspaces-view"] .obsidian-context-workspaces-sidebar {
+	flex: 0 0 auto;
+	width: 100%;
+	height: auto;
+	min-height: auto;
 }
 
 .obsidian-context-workspaces-sidebar {
@@ -397,9 +397,6 @@
 	flex-direction: column;
 	overflow: hidden;
 	padding: 6px 8px;
-	/* Override workspace-split.mod-horizontal styles */
-	flex: 0 0 auto !important;
-	width: auto !important;
 	/* Prevent flickering */
 	will-change: auto;
 	transform: translateZ(0);
@@ -412,9 +409,15 @@
 	z-index: 10;
 }
 
+/* Override workspace-split.mod-* layout via view-container specificity */
+.workspace-leaf-content[data-type="context-workspaces-view"] .obsidian-context-workspaces-sidebar {
+	flex: 0 0 auto;
+	width: auto;
+}
+
 /* Ensure only one sidebar exists */
-.obsidian-context-workspaces-sidebar+.obsidian-context-workspaces-sidebar {
-	display: none !important;
+.workspace-leaf-content[data-type="context-workspaces-view"] .obsidian-context-workspaces-sidebar+.obsidian-context-workspaces-sidebar {
+	display: none;
 }
 
 @keyframes fadeIn {
@@ -690,6 +693,7 @@
 	flex-shrink: 0;
 	will-change: transform, background-color;
 	scroll-snap-align: center;
+	transform-origin: center;
 	/* Prevent flickering */
 	transform: translateZ(0);
 	backface-visibility: hidden;
@@ -815,7 +819,7 @@
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	padding: 20px 20px 0 20px;
+	padding: 20px 20px 0;
 	flex-shrink: 0;
 }
 
@@ -943,10 +947,14 @@
 /* ===== SPECIFIC MODAL STYLES ===== */
 
 /* Space Edit Modal */
-.obsidian-context-workspaces-edit-modal {
-	width: 500px !important;
-	max-width: 500px !important;
-	min-width: 500px !important;
+.modal.obsidian-context-workspaces-edit-modal {
+	width: 500px;
+	max-width: 500px;
+	min-width: 500px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+	background: var(--background-primary);
 }
 
 /* Override ReactModalWrapper inline styles */
@@ -955,12 +963,12 @@
 div[style*="max-width: 90vw"].obsidian-context-workspaces-edit-modal,
 div[style*="max-width: 90vw"] .obsidian-context-workspaces-edit-modal,
 .react-modal-content[style*="max-width: 90vw"] .obsidian-context-workspaces-edit-modal {
-	width: 500px !important;
-	max-width: 500px !important;
+	width: 500px;
+	max-width: 500px;
 }
 
 .obsidian-context-workspaces-edit-modal .obsidian-context-workspaces-modal-body {
-	padding: 20px;
+	padding: 24px;
 }
 
 .obsidian-context-workspaces-edit-modal .obsidian-context-workspaces-modal-body>div {
@@ -979,33 +987,38 @@ div[style*="max-width: 90vw"] .obsidian-context-workspaces-edit-modal,
 /* SpaceEditModal specific label styles */
 .obsidian-context-workspaces-edit-modal label {
 	display: block;
-	font-weight: 500;
-	margin-bottom: 6px;
+	font-weight: 600;
+	margin-bottom: 8px;
 	color: var(--text-normal);
+	font-size: 14px;
 }
 
 /* SpaceEditModal specific input field styles */
 .obsidian-context-workspaces-edit-modal input,
 .obsidian-context-workspaces-edit-modal textarea {
 	width: 100%;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 4px;
+	border: 2px solid var(--background-modifier-border);
+	border-radius: 8px;
 	background: var(--background-primary);
 	color: var(--text-normal);
 	font-size: 14px;
-	transition:
-		border-color 0.2s ease,
-		box-shadow 0.2s ease;
+	padding: 12px 16px;
+	font-family: inherit;
+	box-sizing: border-box;
+	transition: var(--obsidian-context-workspaces-transition);
+	/* Additional styles for input handling */
+	text-rendering: optimizeLegibility;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
 }
 
 .obsidian-context-workspaces-edit-modal input:focus,
 .obsidian-context-workspaces-edit-modal textarea:focus {
 	outline: none;
 	border-color: var(--interactive-accent);
-	box-shadow: 0 0 0 2px var(--interactive-accent-hover);
+	box-shadow: 0 0 0 3px var(--interactive-accent-hover);
+	background: var(--background-primary);
 }
-
-
 
 /* SpaceEditModal specific textarea styles */
 .obsidian-context-workspaces-edit-modal textarea {
@@ -1015,15 +1028,15 @@ div[style*="max-width: 90vw"] .obsidian-context-workspaces-edit-modal,
 }
 
 /* Space Manager Modal */
-.obsidian-context-workspaces-manager-modal {
-	width: 500px !important;
-	max-width: 90vw !important;
+.modal.obsidian-context-workspaces-manager-modal {
+	width: 500px;
+	max-width: 90vw;
 }
 
 /* Help Modal */
-.obsidian-context-workspaces-help-modal {
-	width: 450px !important;
-	max-width: 90vw !important;
+.modal.obsidian-context-workspaces-help-modal {
+	width: 450px;
+	max-width: 90vw;
 }
 
 /* ===== NAME AND ICON CONTAINER ===== */
@@ -1032,7 +1045,7 @@ div[style*="max-width: 90vw"] .obsidian-context-workspaces-edit-modal,
 	display: flex;
 	gap: 16px;
 	align-items: flex-start;
-	margin-bottom: 16px;
+	margin-bottom: 20px;
 }
 
 .obsidian-context-workspaces-name-icon-container .obsidian-context-workspaces-icon-container {
@@ -1121,31 +1134,31 @@ div[style*="max-width: 90vw"] .obsidian-context-workspaces-edit-modal,
 
 /* Show emoji picker above when close to bottom of screen */
 .obsidian-context-workspaces-emoji-picker-popup.bottom-up {
-	top: auto !important;
-	bottom: 100% !important;
-	margin-bottom: 4px !important;
+	top: auto;
+	bottom: 100%;
+	margin-bottom: 4px;
 }
 
 .obsidian-context-workspaces-emoji-picker-popup {
-	position: absolute !important;
-	top: 100% !important;
-	left: 0 !important;
-	z-index: 100000 !important;
+	position: absolute;
+	top: 100%;
+	left: 0;
+	z-index: 10001;
 	background: var(--background-primary);
 	border: 1px solid var(--background-modifier-border);
-	border-radius: 6px;
-	box-shadow: var(--obsidian-context-workspaces-shadow-hover);
+	border-radius: 8px;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 	padding: 8px;
-	width: 320px !important;
-	height: 400px !important;
+	width: 320px;
+	height: 400px;
 	overflow: hidden;
-	margin-top: 4px !important;
-	transform: none !important;
-	display: flex !important;
-	flex-direction: column !important;
+	margin-top: 8px;
+	transform: none;
+	display: flex;
+	flex-direction: column;
 	/* Prevent overflow outside screen */
-	max-width: calc(100vw - 20px) !important;
-	max-height: calc(100vh - 100px) !important;
+	max-width: calc(100vw - 20px);
+	max-height: calc(100vh - 100px);
 }
 
 /* Emoji Mart Picker Styles */
@@ -1157,63 +1170,63 @@ div[style*="max-width: 90vw"] .obsidian-context-workspaces-edit-modal,
 }
 
 .obsidian-context-workspaces-emoji-picker-popup .emoji-mart {
-	background: var(--background-primary) !important;
-	border: none !important;
-	border-radius: 4px !important;
-	flex: 1 !important;
-	width: 100% !important;
-	height: 100% !important;
-	min-height: 0 !important;
-	overflow: auto !important;
+	background: var(--background-primary);
+	border: none;
+	border-radius: 4px;
+	flex: 1;
+	width: 100%;
+	height: 100%;
+	min-height: 0;
+	overflow: auto;
 }
 
 .obsidian-context-workspaces-emoji-picker-popup .emoji-mart * {
-	background: var(--background-primary) !important;
-	color: var(--text-normal) !important;
+	background: var(--background-primary);
+	color: var(--text-normal);
 }
 
 .obsidian-context-workspaces-emoji-picker-popup .emoji-mart .emoji-mart-category-label {
-	background: var(--background-primary) !important;
-	color: var(--text-normal) !important;
+	background: var(--background-primary);
+	color: var(--text-normal);
 }
 
 .obsidian-context-workspaces-emoji-picker-popup .emoji-mart .emoji-mart-emoji {
-	background: transparent !important;
+	background: transparent;
 }
 
 .obsidian-context-workspaces-emoji-picker-popup .emoji-mart .emoji-mart-emoji:hover {
-	background: var(--interactive-hover) !important;
+	background: var(--interactive-hover);
 }
 
 .obsidian-context-workspaces-emoji-picker-popup .emoji-mart .emoji-mart-search {
-	background: var(--background-primary) !important;
-	border: 1px solid var(--background-modifier-border) !important;
-	color: var(--text-normal) !important;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	color: var(--text-normal);
 }
 
 .obsidian-context-workspaces-emoji-picker-popup .emoji-mart .emoji-mart-search input {
-	background: var(--background-primary) !important;
-	color: var(--text-normal) !important;
-	border: none !important;
+	background: var(--background-primary);
+	color: var(--text-normal);
+	border: none;
 }
 
 .obsidian-context-workspaces-emoji-picker-popup .emoji-mart .emoji-mart-category-tabs {
-	background: var(--background-primary) !important;
-	border-bottom: 1px solid var(--background-modifier-border) !important;
+	background: var(--background-primary);
+	border-bottom: 1px solid var(--background-modifier-border);
 }
 
 .obsidian-context-workspaces-emoji-picker-popup .emoji-mart .emoji-mart-category-tab {
-	background: var(--background-primary) !important;
-	color: var(--text-normal) !important;
+	background: var(--background-primary);
+	color: var(--text-normal);
 }
 
 .obsidian-context-workspaces-emoji-picker-popup .emoji-mart .emoji-mart-category-tab:hover {
-	background: var(--interactive-hover) !important;
+	background: var(--interactive-hover);
 }
 
 .obsidian-context-workspaces-emoji-picker-popup .emoji-mart .emoji-mart-category-tab.selected {
-	background: var(--interactive-accent) !important;
-	color: var(--text-on-accent) !important;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
 }
 
 /* ===== DRAG AND DROP STYLES ===== */
@@ -1239,8 +1252,8 @@ div[style*="max-width: 90vw"] .obsidian-context-workspaces-edit-modal,
 	opacity: 0.5;
 	transform: rotate(5deg) scale(1.1);
 	box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
-	background: var(--background-primary) !important;
-	border: 2px dashed var(--interactive-accent) !important;
+	background: var(--background-primary);
+	border: 2px dashed var(--interactive-accent);
 }
 
 .obsidian-context-workspaces-drag-placeholder {
@@ -1313,7 +1326,7 @@ div[style*="max-width: 90vw"] .obsidian-context-workspaces-edit-modal,
 }
 
 .obsidian-context-workspaces-file-selector-shortcuts {
-	margin-top: 8px !important;
+	margin-top: 8px;
 	padding: 8px;
 	background: var(--background-primary);
 	border-radius: 4px;
@@ -1385,7 +1398,7 @@ div[style*="max-width: 90vw"] .obsidian-context-workspaces-edit-modal,
 }
 
 .obsidian-context-workspaces-help-content h3 {
-	margin: 16px 0 8px 0;
+	margin: 16px 0 8px;
 	color: var(--text-normal);
 	font-weight: 600;
 }
@@ -1414,6 +1427,7 @@ div[style*="max-width: 90vw"] .obsidian-context-workspaces-edit-modal,
 .obsidian-context-workspaces-space-item:hover {
 	border-color: var(--interactive-accent);
 	box-shadow: var(--obsidian-context-workspaces-shadow);
+	transform: translateY(-1px);
 }
 
 .obsidian-context-workspaces-space-info {
@@ -1421,7 +1435,7 @@ div[style*="max-width: 90vw"] .obsidian-context-workspaces-edit-modal,
 }
 
 .obsidian-context-workspaces-space-info h3 {
-	margin: 0 0 8px 0;
+	margin: 0 0 8px;
 	font-size: 16px;
 	font-weight: 600;
 	color: var(--text-normal);
@@ -1543,8 +1557,11 @@ div[style*="max-width: 90vw"] .obsidian-context-workspaces-edit-modal,
 	.obsidian-context-workspaces-sidebar {
 		height: auto;
 		min-height: auto;
-		flex: 0 0 auto !important;
-		width: auto !important;
+	}
+
+	.workspace-leaf-content[data-type="context-workspaces-view"] .obsidian-context-workspaces-sidebar {
+		flex: 0 0 auto;
+		width: auto;
 	}
 
 	.obsidian-context-workspaces-item {
@@ -1608,8 +1625,11 @@ div[style*="max-width: 90vw"] .obsidian-context-workspaces-edit-modal,
 .workspace-sidedock-collapsed .obsidian-context-workspaces-sidebar {
 	height: auto;
 	min-height: auto;
-	flex: 0 0 auto !important;
-	width: auto !important;
+}
+
+.workspace-sidedock-collapsed .workspace-leaf-content[data-type="context-workspaces-view"] .obsidian-context-workspaces-sidebar {
+	flex: 0 0 auto;
+	width: auto;
 }
 
 .workspace-sidedock-collapsed .obsidian-context-workspaces-header {
@@ -1810,19 +1830,6 @@ div[style*="max-width: 90vw"] .obsidian-context-workspaces-edit-modal,
 
 /* ===== ANIMATIONS ===== */
 
-.obsidian-context-workspaces-space-item {
-	transition: var(--obsidian-context-workspaces-transition);
-}
-
-.obsidian-context-workspaces-space-item:hover {
-	box-shadow: var(--obsidian-context-workspaces-shadow);
-	transform: translateY(-1px);
-}
-
-.obsidian-context-workspaces-item {
-	transform-origin: center;
-}
-
 .obsidian-context-workspaces-item:active {
 	transform: scale(0.95);
 }
@@ -1867,9 +1874,9 @@ div[style*="max-width: 90vw"] .obsidian-context-workspaces-edit-modal,
 
 /* SpaceCreateModal specific styles */
 .modal.obsidian-context-workspaces-space-create-modal {
-	width: 500px !important;
-	max-width: 500px !important;
-	min-width: 500px !important;
+	width: 500px;
+	max-width: 500px;
+	min-width: 500px;
 }
 
 /* Modal content area */
@@ -1994,40 +2001,6 @@ div[style*="max-width: 90vw"] .obsidian-context-workspaces-edit-modal,
 	border-color: var(--interactive-accent-hover);
 }
 
-/* SpaceEditModal specific modal styles */
-.obsidian-context-workspaces-edit-modal {
-	width: 500px !important;
-	max-width: 500px !important;
-	min-width: 500px !important;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 8px;
-	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-	background: var(--background-primary);
-}
-
-.obsidian-context-workspaces-edit-modal .obsidian-context-workspaces-modal-body {
-	padding: 24px;
-}
-
-/* SpaceEditModal specific input field styles (2px border) */
-.obsidian-context-workspaces-edit-modal input,
-.obsidian-context-workspaces-edit-modal textarea {
-	width: 100%;
-	border: 2px solid var(--background-modifier-border);
-	border-radius: 8px;
-	background: var(--background-primary);
-	color: var(--text-normal);
-	font-size: 14px;
-	padding: 12px 16px;
-	font-family: inherit;
-	box-sizing: border-box;
-	transition: var(--obsidian-context-workspaces-transition);
-	/* Additional styles for input handling */
-	text-rendering: optimizeLegibility;
-	-webkit-font-smoothing: antialiased;
-	-moz-osx-font-smoothing: grayscale;
-}
-
 /* SpaceEditModal select styles */
 .obsidian-context-workspaces-edit-modal select {
 	width: 100%;
@@ -2047,14 +2020,6 @@ div[style*="max-width: 90vw"] .obsidian-context-workspaces-edit-modal,
 	padding-right: 32px;
 }
 
-.obsidian-context-workspaces-edit-modal input:focus,
-.obsidian-context-workspaces-edit-modal textarea:focus {
-	outline: none;
-	border-color: var(--interactive-accent);
-	box-shadow: 0 0 0 3px var(--interactive-accent-hover);
-	background: var(--background-primary);
-}
-
 .obsidian-context-workspaces-edit-modal select:focus {
 	outline: none;
 	border-color: var(--interactive-accent);
@@ -2066,20 +2031,6 @@ div[style*="max-width: 90vw"] .obsidian-context-workspaces-edit-modal,
 .obsidian-context-workspaces-edit-modal textarea::placeholder {
 	color: var(--text-muted);
 	opacity: 0.7;
-}
-
-.obsidian-context-workspaces-edit-modal textarea {
-	resize: vertical;
-	min-height: 80px;
-}
-
-/* SpaceEditModal specific label styles (600 weight) */
-.obsidian-context-workspaces-edit-modal label {
-	display: block;
-	font-weight: 600;
-	margin-bottom: 8px;
-	color: var(--text-normal);
-	font-size: 14px;
 }
 
 /* SpaceEditModal specific button styles */
@@ -2114,20 +2065,14 @@ div[style*="max-width: 90vw"] .obsidian-context-workspaces-edit-modal,
 .obsidian-context-workspaces-edit-modal .obsidian-context-workspaces-modal-button-container button.obsidian-context-workspaces-cta:hover {
 	background: var(--interactive-accent-hover);
 	border-color: var(--interactive-accent-hover);
+	transform: translateY(-1px);
 }
 
 /* SpaceEditModal specific footer styles */
 .obsidian-context-workspaces-edit-modal .obsidian-context-workspaces-modal-footer {
-	padding: 20px 24px 24px 24px;
+	padding: 20px 24px 24px;
 	border-top: 1px solid var(--background-modifier-border);
 	background: var(--background-secondary);
-}
-
-/* Name and icon container - unified styles */
-.obsidian-context-workspaces-name-icon-container {
-	display: flex;
-	gap: 16px;
-	margin-bottom: 20px;
 }
 
 .obsidian-context-workspaces-icon-container {
@@ -2171,107 +2116,17 @@ div[style*="max-width: 90vw"] .obsidian-context-workspaces-edit-modal,
 	box-shadow: 0 0 0 2px var(--interactive-accent-hover);
 }
 
-/* SpaceEditModal specific input field styles (duplicate removed) */
-.obsidian-context-workspaces-edit-modal input:focus,
-.obsidian-context-workspaces-edit-modal textarea:focus {
-	outline: none;
-	border-color: var(--interactive-accent);
-	box-shadow: 0 0 0 3px var(--interactive-accent-hover);
-	background: var(--background-primary);
-}
-
-.obsidian-context-workspaces-edit-modal input::placeholder,
-.obsidian-context-workspaces-edit-modal textarea::placeholder {
-	color: var(--text-muted);
-	opacity: 0.7;
-}
-
-/* SpaceEditModal specific label styles (duplicate removed) */
-.obsidian-context-workspaces-edit-modal label {
-	display: block;
-	font-weight: 600;
-	margin-bottom: 8px;
-	color: var(--text-normal);
-	font-size: 14px;
-}
-
-/* Description area styles */
-.obsidian-context-workspaces-edit-modal .obsidian-context-workspaces-modal-body>div:last-child {
-	margin-bottom: 0;
-}
-
 /* Description container styles */
-/* Description container styles (duplicate removed) */
 .obsidian-context-workspaces-description-container {
 	margin-bottom: 0;
 }
 
-.obsidian-context-workspaces-edit-modal textarea {
-	resize: vertical;
-	min-height: 80px;
-}
-
-/* SpaceEditModal specific footer styles (duplicate removed) */
-.obsidian-context-workspaces-edit-modal .obsidian-context-workspaces-modal-footer {
-	padding: 20px 24px 24px 24px;
-	border-top: 1px solid var(--background-modifier-border);
-	background: var(--background-secondary);
-}
-
-.obsidian-context-workspaces-edit-modal .obsidian-context-workspaces-modal-button-container {
-	margin-top: 0;
-}
-
-/* SpaceEditModal specific button styles (duplicate removed) */
-.obsidian-context-workspaces-edit-modal .obsidian-context-workspaces-modal-button-container button {
-	padding: 10px 20px;
-	border-radius: 6px;
-	border: 2px solid var(--background-modifier-border);
-	background: var(--interactive-normal);
-	color: var(--text-normal);
-	cursor: pointer;
-	font-size: 14px;
-	font-weight: 500;
-	transition: var(--obsidian-context-workspaces-transition);
-}
-
-.obsidian-context-workspaces-edit-modal .obsidian-context-workspaces-modal-button-container button:hover {
-	background: var(--interactive-hover);
-	border-color: var(--interactive-accent);
-	transform: translateY(-1px);
-}
-
-.obsidian-context-workspaces-edit-modal .obsidian-context-workspaces-modal-button-container button.obsidian-context-workspaces-cta {
-	background: var(--interactive-accent);
-	color: var(--text-on-accent);
-	border-color: var(--interactive-accent);
-}
-
-.obsidian-context-workspaces-edit-modal .obsidian-context-workspaces-modal-button-container button.obsidian-context-workspaces-cta:hover {
-	transform: translateY(-1px);
-	background: var(--interactive-accent-hover);
-	border-color: var(--interactive-accent-hover);
-}
-
-/* Emoji picker popup - unified styles */
-.obsidian-context-workspaces-emoji-picker-popup {
-	position: absolute;
-	top: 100%;
-	left: 0;
-	z-index: 10001;
-	margin-top: 8px;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 8px;
-	background: var(--background-primary);
-	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-}
-
 /* Responsive design - unified styles */
 @media (max-width: 600px) {
-	.obsidian-context-workspaces-edit-modal {
-		width: 90vw !important;
-		max-width: 90vw !important;
-		min-width: 90vw !important;
+	.modal.obsidian-context-workspaces-edit-modal {
+		width: 90vw;
+		max-width: 90vw;
+		min-width: 90vw;
 	}
 
 	.obsidian-context-workspaces-name-icon-container {
@@ -2281,15 +2136,6 @@ div[style*="max-width: 90vw"] .obsidian-context-workspaces-edit-modal,
 
 	.obsidian-context-workspaces-icon-container {
 		align-self: flex-start;
-	}
-}
-
-/* SpaceEditModal responsive design */
-@media (max-width: 600px) {
-	.obsidian-context-workspaces-edit-modal {
-		width: 90vw !important;
-		max-width: 90vw !important;
-		min-width: 90vw !important;
 	}
 
 	/* SpaceEditModal specific responsive styles */

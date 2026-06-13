@@ -118,12 +118,11 @@ export const DEFAULT_SETTINGS: ContextWorkspacesSettings = {
 	sidebarViewMode: 'icon',
 };
 
-// Plugin type for better type safety
 export interface ContextWorkspacesPlugin {
 	app: unknown; // Obsidian App instance
 	settings: ContextWorkspacesSettings;
 	saveSettings(): Promise<void>;
-	switchToSpace(spaceId: string): Promise<void>;
+	switchToSpace(spaceId: string, method?: string): Promise<void>;
 	createNewSpace(): Promise<void>;
 	openSpaceManager(): void;
 	deleteSpace(spaceId: string): Promise<void>;

@@ -215,12 +215,12 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
 	func: T,
 	wait: number
 ): (...args: Parameters<T>) => void {
-	let timeout: NodeJS.Timeout | null = null;
+	let timeout: number | null = null;
 	return (...args: Parameters<T>) => {
 		if (timeout) {
-			clearTimeout(timeout);
+			activeWindow.clearTimeout(timeout);
 		}
-		timeout = setTimeout(() => func(...args), wait);
+		timeout = activeWindow.setTimeout(() => func(...args), wait);
 	};
 }
 
@@ -236,7 +236,7 @@ export function throttle<T extends (...args: unknown[]) => unknown>(
 		if (!inThrottle) {
 			func(...args);
 			inThrottle = true;
-			setTimeout(() => {
+			activeWindow.setTimeout(() => {
 				inThrottle = false;
 			}, limit);
 		}

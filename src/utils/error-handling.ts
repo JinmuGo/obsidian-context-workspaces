@@ -116,7 +116,7 @@ export async function safeExecuteWithRetry<T>(
 			errorLogger.logError(errorType, message, { attempt, maxRetries }, lastError);
 
 			if (attempt < maxRetries) {
-				await new Promise((resolve) => setTimeout(resolve, delay * attempt));
+				await new Promise((resolve) => activeWindow.setTimeout(resolve, delay * attempt));
 			}
 		}
 	}

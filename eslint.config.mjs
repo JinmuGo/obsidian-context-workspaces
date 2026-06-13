@@ -1,6 +1,5 @@
 import js from '@eslint/js';
 import globals from 'globals';
-import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import tseslint from 'typescript-eslint';
 import obsidianmd from 'eslint-plugin-obsidianmd';
@@ -25,7 +24,6 @@ export default tseslint.config(
       },
     },
     plugins: {
-      react: react,
       'react-hooks': reactHooks,
       obsidianmd: obsidianmd,
     },
@@ -40,11 +38,6 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/ban-ts-comment': 'warn',
       '@typescript-eslint/require-await': 'off',
-    },
-    settings: {
-      react: {
-        version: 'detect',
-      },
     },
   },
   {

@@ -76,21 +76,21 @@ export class ReactModalWrapper {
 		this.close();
 
 		// Create modal container
-		this.modalContainer = document.createElement('div');
+		this.modalContainer = createDiv();
 		this.modalContainer.className = 'react-modal-container';
 
 		// Create backdrop
-		this.backdrop = document.createElement('div');
+		this.backdrop = createDiv();
 		this.backdrop.className = 'react-modal-backdrop';
 
 		// Modal content container
-		const contentContainer = document.createElement('div');
+		const contentContainer = createDiv();
 		contentContainer.className = 'react-modal-content';
 
 		// Add to DOM
 		this.modalContainer.appendChild(this.backdrop);
 		this.modalContainer.appendChild(contentContainer);
-		document.body.appendChild(this.modalContainer);
+		activeDocument.body.appendChild(this.modalContainer);
 
 		// Render React component
 		this.wrapper.render(component, contentContainer);
@@ -106,11 +106,11 @@ export class ReactModalWrapper {
 				this.close();
 			}
 		};
-		document.addEventListener('keydown', handleEscape);
+		activeDocument.addEventListener('keydown', handleEscape);
 
 		// Store cleanup function
 		this.cleanup = () => {
-			document.removeEventListener('keydown', handleEscape);
+			activeDocument.removeEventListener('keydown', handleEscape);
 		};
 	}
 

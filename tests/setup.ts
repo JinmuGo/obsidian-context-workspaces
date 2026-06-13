@@ -26,6 +26,27 @@ Object.defineProperty(window, 'matchMedia', {
 	})),
 });
 
+// Obsidian injects these as globals at runtime (cross-window safe accessors);
+// JSDOM does not provide them, so polyfill against the test window/document.
+Object.defineProperty(global, 'activeWindow', { writable: true, value: window });
+Object.defineProperty(global, 'activeDocument', { writable: true, value: document });
+Object.defineProperty(global, 'createDiv', {
+	writable: true,
+	value: (
+		o?: string | { cls?: string },
+		callback?: (el: HTMLDivElement) => void
+	): HTMLDivElement => {
+		const div = document.createElement('div');
+		if (typeof o === 'string') {
+			div.className = o;
+		} else if (o?.cls) {
+			div.className = o.cls;
+		}
+		callback?.(div);
+		return div;
+	},
+});
+
 // Console method mocking (control log output during tests)
 global.console = {
 	...console,

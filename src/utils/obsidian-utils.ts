@@ -259,7 +259,7 @@ export function getCurrentTheme(app: App): string {
 		}
 
 		// Method 3: Check body classes for default themes
-		const body = document.body;
+		const body = activeDocument.body;
 		if (body.classList.contains('theme-dark')) {
 			return 'dark';
 		}
@@ -312,9 +312,9 @@ export async function setTheme(app: App, themeName: string): Promise<void> {
 				}
 
 				// Force Obsidian to refresh the theme immediately
-				setTimeout(() => {
+				activeWindow.setTimeout(() => {
 					const event = new CustomEvent('theme-change', { detail: { theme: themeName } });
-					document.dispatchEvent(event);
+					activeDocument.dispatchEvent(event);
 
 					if (workspace.trigger) {
 						workspace.trigger('resize');
@@ -339,7 +339,7 @@ export async function setTheme(app: App, themeName: string): Promise<void> {
 export function getCurrentThemeMode(app: App): ThemeMode {
 	try {
 		// Check body classes for current mode
-		const body = document.body;
+		const body = activeDocument.body;
 		if (body.classList.contains('theme-dark')) {
 			return 'dark';
 		}
@@ -366,7 +366,7 @@ export function getCurrentThemeMode(app: App): ThemeMode {
  * Get current theme mode for UI components (resolves system mode to actual light/dark)
  */
 export function getCurrentThemeModeForUI(): 'light' | 'dark' {
-	const body = document.body;
+	const body = activeDocument.body;
 	if (body.classList.contains('theme-dark')) {
 		return 'dark';
 	}
@@ -382,7 +382,7 @@ export function getCurrentThemeModeForUI(): 'light' | 'dark' {
  */
 export async function setThemeMode(app: App, mode: ThemeMode): Promise<void> {
 	try {
-		const body = document.body;
+		const body = activeDocument.body;
 		const currentMode = getCurrentThemeMode(app);
 
 		// Only change if the mode is actually different
@@ -438,9 +438,9 @@ export async function setThemeMode(app: App, mode: ThemeMode): Promise<void> {
 		window.dispatchEvent(new CustomEvent('theme-mode-change', { detail: { mode } }));
 
 		// Force Obsidian to refresh the theme mode immediately
-		setTimeout(() => {
+		activeWindow.setTimeout(() => {
 			const event = new CustomEvent('theme-change', { detail: { mode } });
-			document.dispatchEvent(event);
+			activeDocument.dispatchEvent(event);
 
 			if (workspace.trigger) {
 				workspace.trigger('resize');
@@ -530,9 +530,9 @@ function setThemeTemporarily(app: App, themeName: string): void {
 			}
 
 			// Force Obsidian to refresh the theme immediately
-			setTimeout(() => {
+			activeWindow.setTimeout(() => {
 				const event = new CustomEvent('theme-change', { detail: { theme: themeName } });
-				document.dispatchEvent(event);
+				activeDocument.dispatchEvent(event);
 
 				if (workspace.trigger) {
 					workspace.trigger('resize');
@@ -555,7 +555,7 @@ function setThemeTemporarily(app: App, themeName: string): void {
  */
 function setThemeModeTemporarily(app: App, mode: ThemeMode): void {
 	try {
-		const body = document.body;
+		const body = activeDocument.body;
 		const currentMode = getCurrentThemeMode(app);
 
 		// Only change if the mode is actually different
@@ -598,9 +598,9 @@ function setThemeModeTemporarily(app: App, mode: ThemeMode): void {
 
 		window.dispatchEvent(new CustomEvent('theme-mode-change', { detail: { mode } }));
 
-		setTimeout(() => {
+		activeWindow.setTimeout(() => {
 			const event = new CustomEvent('theme-change', { detail: { mode } });
-			document.dispatchEvent(event);
+			activeDocument.dispatchEvent(event);
 
 			if (workspace.trigger) {
 				workspace.trigger('resize');
@@ -648,7 +648,7 @@ export function setupWorkspaceLoadMonitoring(app: App, plugin: ContextWorkspaces
 
 			if (spaceExists && workspaceId !== currentSpaceId) {
 				// Switch to the corresponding Context Space
-				setTimeout(() => {
+				activeWindow.setTimeout(() => {
 					void plugin.switchToSpace(workspaceId).catch((error) => {
 						console.error('Failed to auto-switch to Context Space:', error);
 					});

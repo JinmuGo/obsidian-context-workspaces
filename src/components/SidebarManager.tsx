@@ -238,7 +238,7 @@ export const SidebarManager: React.FC<SidebarManagerProps> = ({ plugin }) => {
 						setAnimationDirection(direction);
 
 						// Clear animation after animation completes
-						setTimeout(() => {
+						activeWindow.setTimeout(() => {
 							setAnimationDirection(null);
 						}, 300);
 					}
@@ -255,9 +255,9 @@ export const SidebarManager: React.FC<SidebarManagerProps> = ({ plugin }) => {
 		updateState();
 
 		// Use a more efficient update mechanism
-		const interval = setInterval(updateState, 500);
+		const interval = activeWindow.setInterval(updateState, 500);
 		return () => {
-			clearInterval(interval);
+			activeWindow.clearInterval(interval);
 		};
 	}, [plugin, spaces, spaceOrder, currentSpaceId]); // Include dependencies to ensure proper updates
 
@@ -305,7 +305,7 @@ export const SidebarManager: React.FC<SidebarManagerProps> = ({ plugin }) => {
 
 		// Scroll to center the active space if using centered layout
 		if (shouldUseCenteredLayout) {
-			setTimeout(() => {
+			activeWindow.setTimeout(() => {
 				const carousel = containerRef.current?.querySelector(
 					'.obsidian-context-workspaces-carousel'
 				) as HTMLElement;
