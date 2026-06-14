@@ -141,6 +141,7 @@ export const ContextWorkspacesSettingTab: React.FC<ContextWorkspacesSettingTabPr
 	const [spaceOrder, setSpaceOrder] = useState(plugin.settings.spaceOrder);
 	const [showHelp, setShowHelp] = useState(false);
 	const [editingSpaceId, setEditingSpaceId] = useState<string | null>(null);
+	const [showStatusBar, setShowStatusBar] = useState(plugin.settings.showStatusBar !== false);
 
 	// Update state when plugin settings change
 	useEffect(() => {
@@ -202,6 +203,14 @@ export const ContextWorkspacesSettingTab: React.FC<ContextWorkspacesSettingTabPr
 		setSpaces(updatedSpaces);
 
 		plugin.updateSidebarSpacesOptimized();
+	};
+
+	const handleToggleStatusBar = () => {
+		const next = !showStatusBar;
+		setShowStatusBar(next);
+		plugin.settings.showStatusBar = next;
+		void plugin.saveSettings();
+		plugin.refreshStatusBar();
 	};
 
 	const handleEditSpace = (spaceId: string) => {
@@ -298,6 +307,32 @@ export const ContextWorkspacesSettingTab: React.FC<ContextWorkspacesSettingTabPr
 				</div>
 
 				<h3>General settings</h3>
+
+				<div className="obsidian-context-workspaces-setting-item">
+					<div className="obsidian-context-workspaces-setting-item-info">
+						<div className="obsidian-context-workspaces-setting-item-name">
+							Show status bar switcher
+						</div>
+						<div className="obsidian-context-workspaces-setting-item-description">
+							Show the current space in the status bar. Click it to quickly switch
+							between spaces.
+						</div>
+					</div>
+					<div className="obsidian-context-workspaces-setting-item-control">
+						<button
+							type="button"
+							className={`obsidian-context-workspaces-switch-toggle ${showStatusBar ? 'active' : ''}`}
+							onClick={handleToggleStatusBar}
+							onKeyDown={(e) => {
+								if (e.key === 'Enter' || e.key === ' ') {
+									e.preventDefault();
+									handleToggleStatusBar();
+								}
+							}}
+							aria-label="Toggle status bar space switcher"
+						/>
+					</div>
+				</div>
 
 				<div className="obsidian-context-workspaces-setting-item">
 					<div className="obsidian-context-workspaces-setting-item-info">

@@ -109,6 +109,7 @@ export interface ContextWorkspacesSettings {
 	currentSpaceId: string;
 	workspaceLastSeen?: Record<string, number>; // Track when workspaces were last seen
 	sidebarViewMode?: SidebarViewMode; // Sidebar display mode: 'icon' or 'list'
+	showStatusBar?: boolean; // Show the status bar space switcher
 }
 
 export const DEFAULT_SETTINGS: ContextWorkspacesSettings = {
@@ -116,6 +117,7 @@ export const DEFAULT_SETTINGS: ContextWorkspacesSettings = {
 	currentSpaceId: '',
 	spaceOrder: [],
 	sidebarViewMode: 'icon',
+	showStatusBar: true,
 };
 
 export interface ContextWorkspacesPlugin {
@@ -125,6 +127,7 @@ export interface ContextWorkspacesPlugin {
 	switchToSpace(spaceId: string, method?: string): Promise<void>;
 	createNewSpace(): Promise<void>;
 	openSpaceManager(): void;
+	refreshStatusBar(): void;
 	deleteSpace(spaceId: string): Promise<void>;
 	updateSidebarSpaces(): void;
 	updateSidebarSpacesOptimized(): void;
