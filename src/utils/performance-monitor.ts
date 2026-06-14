@@ -218,9 +218,9 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
 	let timeout: number | null = null;
 	return (...args: Parameters<T>) => {
 		if (timeout) {
-			activeWindow.clearTimeout(timeout);
+			window.clearTimeout(timeout);
 		}
-		timeout = activeWindow.setTimeout(() => func(...args), wait);
+		timeout = window.setTimeout(() => func(...args), wait);
 	};
 }
 
@@ -236,7 +236,7 @@ export function throttle<T extends (...args: unknown[]) => unknown>(
 		if (!inThrottle) {
 			func(...args);
 			inThrottle = true;
-			activeWindow.setTimeout(() => {
+			window.setTimeout(() => {
 				inThrottle = false;
 			}, limit);
 		}

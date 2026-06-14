@@ -70,8 +70,8 @@ export default class ContextWorkspacesPlugin extends Plugin {
 			// @ts-expect-error - Event 'workspace-changed' is not in the public API types
 			this.app.workspace.on('workspace-changed', () => {
 				// Debounce workspace change events to prevent excessive calls
-				activeWindow.clearTimeout(this.workspaceChangeTimeout);
-				this.workspaceChangeTimeout = activeWindow.setTimeout(() => {
+				window.clearTimeout(this.workspaceChangeTimeout);
+				this.workspaceChangeTimeout = window.setTimeout(() => {
 					this.handleWorkspaceChange();
 				}, 1000); // Wait 1 second before processing workspace changes
 			})
@@ -132,7 +132,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		backupThemeState(this.app);
 
 		// Apply current space theme on load
-		activeWindow.setTimeout(() => {
+		window.setTimeout(() => {
 			try {
 				this.applyCurrentSpaceTheme();
 			} catch (error) {
@@ -155,8 +155,8 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		})();
 
 		// Clear timeouts
-		activeWindow.clearTimeout(this.layoutChangeTimeout);
-		activeWindow.clearTimeout(this.workspaceChangeTimeout);
+		window.clearTimeout(this.layoutChangeTimeout);
+		window.clearTimeout(this.workspaceChangeTimeout);
 
 		// Remove workspace load monitoring
 		removeWorkspaceLoadMonitoring(this.app);
@@ -288,7 +288,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 			await this.loadSpaceState(spaceId);
 
 			// Update sidebar safely with delay to ensure state is stable
-			activeWindow.setTimeout(() => {
+			window.setTimeout(() => {
 				try {
 					this.getView()?.render();
 				} catch (error) {
@@ -320,7 +320,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		this.settings.spaceOrder = newSpaceOrder;
 
 		// Update sidebar to reflect the new order safely with delay
-		activeWindow.setTimeout(() => {
+		window.setTimeout(() => {
 			try {
 				this.getView()?.render();
 			} catch (error) {
@@ -409,7 +409,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		await this.switchToSpace(spaceId);
 
 		// Update sidebar safely with delay
-		activeWindow.setTimeout(() => {
+		window.setTimeout(() => {
 			try {
 				this.getView()?.render();
 			} catch (error) {
@@ -468,7 +468,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		}
 
 		// Update sidebar safely with delay
-		activeWindow.setTimeout(() => {
+		window.setTimeout(() => {
 			try {
 				this.getView()?.render();
 			} catch (error) {
@@ -487,8 +487,8 @@ export default class ContextWorkspacesPlugin extends Plugin {
 			const currentSpace = this.settings.spaces[this.settings.currentSpaceId];
 			if (currentSpace?.autoSave) {
 				// Debounce to avoid excessive saves
-				activeWindow.clearTimeout(this.layoutChangeTimeout);
-				this.layoutChangeTimeout = activeWindow.setTimeout(() => {
+				window.clearTimeout(this.layoutChangeTimeout);
+				this.layoutChangeTimeout = window.setTimeout(() => {
 					this.saveCurrentSpaceState();
 				}, 500);
 			}
@@ -501,7 +501,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 
 	// Compatibility methods for sidebar manager
 	updateSidebarSpaces() {
-		activeWindow.setTimeout(() => {
+		window.setTimeout(() => {
 			try {
 				this.getView()?.render();
 			} catch (error) {
@@ -511,7 +511,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 	}
 
 	updateSidebarSpacesOptimized() {
-		activeWindow.setTimeout(() => {
+		window.setTimeout(() => {
 			try {
 				this.getView()?.render();
 			} catch (error) {
@@ -798,7 +798,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		}
 
 		// Set up periodic sync (every 30 seconds) only if sync is needed
-		activeWindow.setInterval(() => {
+		window.setInterval(() => {
 			if (
 				needsSync(this.app, this.settings) ||
 				needsDeletionDetection(this.app, this.settings)

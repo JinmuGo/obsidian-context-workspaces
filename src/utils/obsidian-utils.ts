@@ -312,7 +312,7 @@ export async function setTheme(app: App, themeName: string): Promise<void> {
 				}
 
 				// Force Obsidian to refresh the theme immediately
-				activeWindow.setTimeout(() => {
+				window.setTimeout(() => {
 					const event = new CustomEvent('theme-change', { detail: { theme: themeName } });
 					activeDocument.dispatchEvent(event);
 
@@ -438,7 +438,7 @@ export async function setThemeMode(app: App, mode: ThemeMode): Promise<void> {
 		window.dispatchEvent(new CustomEvent('theme-mode-change', { detail: { mode } }));
 
 		// Force Obsidian to refresh the theme mode immediately
-		activeWindow.setTimeout(() => {
+		window.setTimeout(() => {
 			const event = new CustomEvent('theme-change', { detail: { mode } });
 			activeDocument.dispatchEvent(event);
 
@@ -530,7 +530,7 @@ function setThemeTemporarily(app: App, themeName: string): void {
 			}
 
 			// Force Obsidian to refresh the theme immediately
-			activeWindow.setTimeout(() => {
+			window.setTimeout(() => {
 				const event = new CustomEvent('theme-change', { detail: { theme: themeName } });
 				activeDocument.dispatchEvent(event);
 
@@ -598,7 +598,7 @@ function setThemeModeTemporarily(app: App, mode: ThemeMode): void {
 
 		window.dispatchEvent(new CustomEvent('theme-mode-change', { detail: { mode } }));
 
-		activeWindow.setTimeout(() => {
+		window.setTimeout(() => {
 			const event = new CustomEvent('theme-change', { detail: { mode } });
 			activeDocument.dispatchEvent(event);
 
@@ -648,7 +648,7 @@ export function setupWorkspaceLoadMonitoring(app: App, plugin: ContextWorkspaces
 
 			if (spaceExists && workspaceId !== currentSpaceId) {
 				// Switch to the corresponding Context Space
-				activeWindow.setTimeout(() => {
+				window.setTimeout(() => {
 					void plugin.switchToSpace(workspaceId).catch((error) => {
 						console.error('Failed to auto-switch to Context Space:', error);
 					});
