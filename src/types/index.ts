@@ -109,6 +109,7 @@ export interface ContextWorkspacesSettings {
 	currentSpaceId: string;
 	workspaceLastSeen?: Record<string, number>; // Track when workspaces were last seen
 	sidebarViewMode?: SidebarViewMode; // Sidebar display mode: 'icon' or 'list'
+	activateViewOnStartup?: boolean; // Reveal the Context Workspaces tab on startup
 }
 
 export const DEFAULT_SETTINGS: ContextWorkspacesSettings = {
@@ -116,6 +117,7 @@ export const DEFAULT_SETTINGS: ContextWorkspacesSettings = {
 	currentSpaceId: '',
 	spaceOrder: [],
 	sidebarViewMode: 'icon',
+	activateViewOnStartup: true,
 };
 
 export interface ContextWorkspacesPlugin {
