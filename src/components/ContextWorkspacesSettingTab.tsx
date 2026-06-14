@@ -141,6 +141,9 @@ export const ContextWorkspacesSettingTab: React.FC<ContextWorkspacesSettingTabPr
 	const [spaceOrder, setSpaceOrder] = useState(plugin.settings.spaceOrder);
 	const [showHelp, setShowHelp] = useState(false);
 	const [editingSpaceId, setEditingSpaceId] = useState<string | null>(null);
+	const [activateOnStartup, setActivateOnStartup] = useState(
+		plugin.settings.activateViewOnStartup !== false
+	);
 	const [showStatusBar, setShowStatusBar] = useState(plugin.settings.showStatusBar !== false);
 
 	// Update state when plugin settings change
@@ -203,6 +206,13 @@ export const ContextWorkspacesSettingTab: React.FC<ContextWorkspacesSettingTabPr
 		setSpaces(updatedSpaces);
 
 		plugin.updateSidebarSpacesOptimized();
+	};
+
+	const handleToggleActivateOnStartup = () => {
+		const next = !activateOnStartup;
+		setActivateOnStartup(next);
+		plugin.settings.activateViewOnStartup = next;
+		void plugin.saveSettings();
 	};
 
 	const handleToggleStatusBar = () => {
@@ -330,6 +340,32 @@ export const ContextWorkspacesSettingTab: React.FC<ContextWorkspacesSettingTabPr
 								}
 							}}
 							aria-label="Toggle status bar space switcher"
+						/>
+					</div>
+				</div>
+
+				<div className="obsidian-context-workspaces-setting-item">
+					<div className="obsidian-context-workspaces-setting-item-info">
+						<div className="obsidian-context-workspaces-setting-item-name">
+							Activate on startup
+						</div>
+						<div className="obsidian-context-workspaces-setting-item-description">
+							Open the Context Workspaces tab and bring it to the front when Obsidian
+							starts. Disable to keep your last-used sidebar tab in front.
+						</div>
+					</div>
+					<div className="obsidian-context-workspaces-setting-item-control">
+						<button
+							type="button"
+							className={`obsidian-context-workspaces-switch-toggle ${activateOnStartup ? 'active' : ''}`}
+							onClick={handleToggleActivateOnStartup}
+							onKeyDown={(e) => {
+								if (e.key === 'Enter' || e.key === ' ') {
+									e.preventDefault();
+									handleToggleActivateOnStartup();
+								}
+							}}
+							aria-label="Toggle activate Context Workspaces on startup"
 						/>
 					</div>
 				</div>

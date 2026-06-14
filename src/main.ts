@@ -50,9 +50,13 @@ export default class ContextWorkspacesPlugin extends Plugin {
 			return new ContextWorkspacesView(leaf, this);
 		});
 
-		// Activate view when layout is ready
+		// Activate view when layout is ready, unless the user opted out so their
+		// last-used sidebar tab stays in front. The view leaf is still restored
+		// by Obsidian's saved layout; it just isn't forced to the foreground.
 		this.app.workspace.onLayoutReady(() => {
-			void this.activateView();
+			if (this.settings.activateViewOnStartup !== false) {
+				void this.activateView();
+			}
 		});
 
 		// Add ribbon icon for quick toggle
@@ -516,6 +520,20 @@ export default class ContextWorkspacesPlugin extends Plugin {
 
 	openSpaceManager() {
 		new SpaceManagerModal(this.app, this).open();
+	}
+
+	/**
+	 * Open this plugin's settings tab.
+	 * `app.setting` is an internal (undocumented) Obsidian API.
+	 */
+	openSettings(): void {
+		const setting = (
+			this.app as unknown as {
+				setting?: { open: () => void; openTabById: (id: string) => void };
+			}
+		).setting;
+		setting?.open();
+		setting?.openTabById(this.manifest.id);
 	}
 
 
