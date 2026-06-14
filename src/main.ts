@@ -435,6 +435,20 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		new SpaceManagerModal(this.app, this).open();
 	}
 
+	/**
+	 * Open this plugin's settings tab.
+	 * `app.setting` is an internal (undocumented) Obsidian API.
+	 */
+	openSettings(): void {
+		const setting = (
+			this.app as unknown as {
+				setting?: { open: () => void; openTabById: (id: string) => void };
+			}
+		).setting;
+		setting?.open();
+		setting?.openTabById(this.manifest.id);
+	}
+
 
 
 	async deleteSpace(spaceId: string) {

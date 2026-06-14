@@ -125,6 +125,7 @@ export interface ContextWorkspacesPlugin {
 	switchToSpace(spaceId: string, method?: string): Promise<void>;
 	createNewSpace(): Promise<void>;
 	openSpaceManager(): void;
+	openSettings(): void;
 	deleteSpace(spaceId: string): Promise<void>;
 	updateSidebarSpaces(): void;
 	updateSidebarSpacesOptimized(): void;
