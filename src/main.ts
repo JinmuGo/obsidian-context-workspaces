@@ -1,4 +1,4 @@
-import { Notice, Plugin, type TFile } from 'obsidian';
+import { Menu, Notice, Plugin, type TFile } from 'obsidian';
 import type { ContextWorkspacesSettings } from './types';
 import { DEFAULT_SETTINGS } from './types';
 import { needsDeletionDetection, safeDeletionDetection } from './utils/deletion-detection-utils';
@@ -23,6 +23,7 @@ import {
 	parseSpaceData,
 	searchSpaces,
 } from './utils/space-utils';
+import { formatStatusBarLabel } from './utils/status-bar-utils';
 import { needsSync, safeBidirectionalSync } from './utils/sync-utils';
 import {
 	ContextWorkspacesView,
@@ -39,6 +40,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 	layoutChangeTimeout: number;
 	workspaceChangeTimeout: number;
 	switchingToSpaceId: string | null = null;
+	private statusBarItem: HTMLElement | null = null;
 
 	async onload() {
 		await this.loadSettings();
@@ -126,6 +128,9 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		// Initialize default space
 		await this.initializeDefaultSpace();
 
+		// Set up the status bar space switcher
+		this.setupStatusBar();
+
 		// Initialize workspace synchronization
 		await this.initializeWorkspaceSync();
 
@@ -161,6 +166,9 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		// Clear timeouts
 		window.clearTimeout(this.layoutChangeTimeout);
 		window.clearTimeout(this.workspaceChangeTimeout);
+
+		// Drop the status bar reference (Obsidian removes the element itself)
+		this.statusBarItem = null;
 
 		// Remove workspace load monitoring
 		removeWorkspaceLoadMonitoring(this.app);
@@ -201,6 +209,78 @@ export default class ContextWorkspacesPlugin extends Plugin {
 			return leaves[0].view as ContextWorkspacesView;
 		}
 		return null;
+	}
+
+	/**
+	 * Create the status bar space switcher, if enabled.
+	 */
+	private setupStatusBar(): void {
+		if (this.settings.showStatusBar === false) {
+			return;
+		}
+
+		this.statusBarItem = this.addStatusBarItem();
+		this.statusBarItem.addClass('mod-clickable');
+		this.statusBarItem.setAttribute('aria-label', 'Switch space');
+		this.registerDomEvent(this.statusBarItem, 'click', (evt) => {
+			this.openStatusBarMenu(evt);
+		});
+
+		this.updateStatusBar();
+	}
+
+	/**
+	 * Update the status bar label to reflect the current space.
+	 */
+	private updateStatusBar(): void {
+		if (!this.statusBarItem) {
+			return;
+		}
+
+		const space = this.settings.spaces[this.settings.currentSpaceId];
+		this.statusBarItem.setText(space ? formatStatusBarLabel(space) : 'No space');
+	}
+
+	/**
+	 * Create or remove the status bar item to match the current setting.
+	 * Lets the settings toggle take effect without reloading the plugin.
+	 */
+	refreshStatusBar(): void {
+		if (this.settings.showStatusBar === false) {
+			this.statusBarItem?.remove();
+			this.statusBarItem = null;
+			return;
+		}
+
+		if (!this.statusBarItem) {
+			this.setupStatusBar();
+		} else {
+			this.updateStatusBar();
+		}
+	}
+
+	/**
+	 * Open a menu listing all spaces for quick switching.
+	 */
+	private openStatusBarMenu(evt: MouseEvent): void {
+		const menu = new Menu();
+
+		for (const spaceId of this.settings.spaceOrder) {
+			const space = this.settings.spaces[spaceId];
+			if (!space) {
+				continue;
+			}
+
+			menu.addItem((item) => {
+				item.setTitle(formatStatusBarLabel(space))
+					.setChecked(spaceId === this.settings.currentSpaceId)
+					.onClick(() => {
+						void this.switchToSpace(spaceId, 'status-bar');
+					});
+			});
+		}
+
+		menu.showAtMouseEvent(evt);
 	}
 
 	async loadSettings() {
@@ -264,6 +344,9 @@ export default class ContextWorkspacesPlugin extends Plugin {
 			// Switch to new space
 			this.settings.currentSpaceId = spaceId;
 			await this.saveSettings();
+
+			// Reflect the new current space in the status bar
+			this.updateStatusBar();
 
 			// Apply space theme if configured (with error handling)
 			const space = this.settings.spaces[spaceId];
@@ -522,6 +605,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		window.setTimeout(() => {
 			try {
 				this.getView()?.render();
+				this.updateStatusBar();
 			} catch (error) {
 				console.error('Failed to update sidebar spaces:', error);
 			}
@@ -532,6 +616,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		window.setTimeout(() => {
 			try {
 				this.getView()?.render();
+				this.updateStatusBar();
 			} catch (error) {
 				console.error('Failed to update sidebar spaces optimized:', error);
 			}
