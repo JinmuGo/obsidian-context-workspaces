@@ -13,7 +13,6 @@ export const VIEW_TYPE_CONTEXT_WORKSPACES = 'context-workspaces-view';
 export class ContextWorkspacesView extends ItemView {
 	plugin: ContextWorkspacesPlugin;
 	private reactWrapper: ReactWrapper;
-	private settingsActionAdded = false;
 
 	constructor(leaf: WorkspaceLeaf, plugin: ContextWorkspacesPlugin) {
 		super(leaf);
@@ -34,13 +33,6 @@ export class ContextWorkspacesView extends ItemView {
 	}
 
 	async onOpen(): Promise<void> {
-		// Add a gear button to the view header that opens the plugin settings.
-		// Guarded so reopening the view does not stack duplicate actions.
-		if (!this.settingsActionAdded) {
-			this.addAction('settings', 'Open settings', () => this.plugin.openSettings());
-			this.settingsActionAdded = true;
-		}
-
 		const container = this.containerEl.children[1];
 		if (container.instanceOf(HTMLElement)) {
 			container.empty();

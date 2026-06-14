@@ -450,6 +450,7 @@
 	flex: 1;
 }
 
+.obsidian-context-workspaces-header .obsidian-context-workspaces-settings-btn,
 .obsidian-context-workspaces-header .obsidian-context-workspaces-help-btn,
 .obsidian-context-workspaces-header .obsidian-context-workspaces-add-btn {
 	flex-shrink: 0;
@@ -507,6 +508,29 @@
 }
 
 .obsidian-context-workspaces-help-btn:hover {
+	background: var(--interactive-hover);
+	transform: scale(1.1);
+	color: var(--text-accent);
+}
+
+/* Settings button */
+.obsidian-context-workspaces-settings-btn {
+	width: 20px;
+	height: 20px;
+	border-radius: 50%;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--interactive-normal);
+	color: var(--text-normal);
+	cursor: pointer;
+	font-size: 12px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: var(--obsidian-context-workspaces-transition);
+	margin-right: 4px;
+}
+
+.obsidian-context-workspaces-settings-btn:hover {
 	background: var(--interactive-hover);
 	transform: scale(1.1);
 	color: var(--text-accent);

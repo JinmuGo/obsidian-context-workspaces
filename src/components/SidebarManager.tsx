@@ -353,6 +353,11 @@ export const SidebarManager: React.FC<SidebarManagerProps> = ({ plugin }) => {
 		void plugin.createNewSpace();
 	};
 
+	const handleOpenSettings = () => {
+		if (!isMountedRef.current) return;
+		plugin.openSettings();
+	};
+
 	const handleToggleViewMode = () => {
 		if (!isMountedRef.current) return;
 		const newMode: SidebarViewMode = viewMode === 'icon' ? 'list' : 'icon';
@@ -416,6 +421,17 @@ export const SidebarManager: React.FC<SidebarManagerProps> = ({ plugin }) => {
 							title={viewMode === 'icon' ? 'Switch to list view' : 'Switch to icon view'}
 						>
 							{viewMode === 'icon' ? '≡' : '⊞'}
+						</button>
+
+						{/* Settings button */}
+						<button
+							type="button"
+							className="obsidian-context-workspaces-settings-btn"
+							onClick={handleOpenSettings}
+							title="Open settings"
+							aria-label="Open settings"
+						>
+							{'⚙︎'}
 						</button>
 
 						{/* Help button */}
