@@ -64,14 +64,14 @@ export class MemoryMonitor {
 		}
 
 		this.isMonitoring = true;
-		this.checkInterval = activeWindow.setInterval(() => {
+		this.checkInterval = window.setInterval(() => {
 			this.checkMemoryUsage();
 		}, intervalMs);
 	}
 
 	stopMonitoring(): void {
 		if (this.checkInterval) {
-			activeWindow.clearInterval(this.checkInterval);
+			window.clearInterval(this.checkInterval);
 			this.checkInterval = null;
 		}
 		this.isMonitoring = false;
@@ -183,7 +183,7 @@ export class TimerManager {
 	private timers: Array<{ id: number; description: string }> = [];
 
 	setTimeout(callback: () => void, delay: number, description = 'Unknown'): number {
-		const id = activeWindow.setTimeout(() => {
+		const id = window.setTimeout(() => {
 			callback();
 			this.removeTimer(id);
 		}, delay);
@@ -192,18 +192,18 @@ export class TimerManager {
 	}
 
 	setInterval(callback: () => void, delay: number, description = 'Unknown'): number {
-		const id = activeWindow.setInterval(callback, delay);
+		const id = window.setInterval(callback, delay);
 		this.timers.push({ id, description });
 		return id;
 	}
 
 	clearTimeout(id: number): void {
-		activeWindow.clearTimeout(id);
+		window.clearTimeout(id);
 		this.removeTimer(id);
 	}
 
 	clearInterval(id: number): void {
-		activeWindow.clearInterval(id);
+		window.clearInterval(id);
 		this.removeTimer(id);
 	}
 
@@ -216,8 +216,8 @@ export class TimerManager {
 
 	cleanup(): void {
 		this.timers.forEach(({ id }) => {
-			activeWindow.clearTimeout(id);
-			activeWindow.clearInterval(id);
+			window.clearTimeout(id);
+			window.clearInterval(id);
 		});
 		this.timers = [];
 	}

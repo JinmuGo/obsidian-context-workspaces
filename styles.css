@@ -622,7 +622,6 @@
 	flex: 1;
 	padding: 2px 0;
 	scroll-behavior: smooth;
-	scrollbar-width: none;
 	-ms-overflow-style: none;
 	height: 40px;
 	transition: opacity 0.1s ease;
@@ -1725,8 +1724,6 @@ div[style*="max-width: 90vw"] .obsidian-context-workspaces-edit-modal,
 	overflow-y: auto;
 	overflow-x: hidden;
 	padding: 4px 0;
-	scrollbar-width: thin;
-	scrollbar-color: var(--background-modifier-border) transparent;
 }
 
 .obsidian-context-workspaces-list-container::-webkit-scrollbar {

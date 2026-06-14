@@ -150,7 +150,7 @@ export class SpaceCreateModal extends Modal {
 		});
 
 		// Focus on name input
-		activeWindow.setTimeout(() => {
+		window.setTimeout(() => {
 			this.nameInput.focus();
 		}, 100);
 

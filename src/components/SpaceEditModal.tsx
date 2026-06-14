@@ -140,7 +140,7 @@ export const SpaceEditModal: React.FC<SpaceEditModalProps> = ({
 					);
 					
 					// Force CSS refresh and UI update
-					activeWindow.setTimeout(() => {
+					window.setTimeout(() => {
 						// Trigger CSS change event
 						const workspace = (plugin.app as App).workspace as { trigger?: (event: string) => void };
 						if (workspace.trigger) {
