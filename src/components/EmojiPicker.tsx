@@ -43,7 +43,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onEmojiSelect, theme =
 			emojiSize: 20,
 			perLine: 8,
 			maxFrequentRows: 0,
-			locale: 'ko',
+			locale: 'en',
 			categories: [
 				'frequent',
 				'people',
