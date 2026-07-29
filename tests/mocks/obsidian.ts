@@ -100,6 +100,58 @@ export class Plugin {
 	}
 }
 
+export class ItemView {
+	leaf: unknown;
+
+	constructor(leaf: unknown) {
+		this.leaf = leaf;
+	}
+
+	getViewType(): string {
+		return '';
+	}
+
+	getDisplayText(): string {
+		return '';
+	}
+
+	async onOpen(): Promise<void> {
+		// ItemView open logic
+	}
+
+	async onClose(): Promise<void> {
+		// ItemView close logic
+	}
+}
+
+export class PluginSettingTab {
+	app: unknown;
+	plugin: unknown;
+
+	constructor(app: unknown, plugin: unknown) {
+		this.app = app;
+		this.plugin = plugin;
+	}
+
+	display(): void {
+		// PluginSettingTab display logic
+	}
+
+	hide(): void {
+		// PluginSettingTab hide logic
+	}
+}
+
+export class Menu {
+	addItem(_callback: (item: unknown) => void): this {
+		return this;
+	}
+
+	showAtMouseEvent(_evt: unknown): void {
+		// Menu display logic
+	}
+}
+
 // App 모킹
 export const mockApp = {
 	workspace: {

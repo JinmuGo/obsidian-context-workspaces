@@ -85,10 +85,20 @@ export interface WorkspacesInstance {
 	_originalLoadWorkspace?: (id: string) => Promise<void>;
 }
 
+// Queued space switch request (last-wins) while a switch is in flight.
+// Carries the full request so a queued native-switcher follow-up keeps skipSave.
+export interface PendingSpaceRequest {
+	spaceId: string;
+	method: string;
+	skipSave: boolean;
+}
+
 // Context Workspaces plugin-like interface
 export interface ContextWorkspacesPluginLike {
 	settings: { spaces: Record<string, unknown>; currentSpaceId: string };
-	switchToSpace: (spaceId: string) => Promise<void>;
+	switchingToSpaceId: string | null;
+	switchToSpace: (spaceId: string, method?: string, skipSave?: boolean) => Promise<void>;
+	saveCurrentSpaceState: () => void;
 }
 
 // ===== Existing Type Definitions =====
@@ -126,7 +136,7 @@ export interface ContextWorkspacesPlugin {
 	app: unknown; // Obsidian App instance
 	settings: ContextWorkspacesSettings;
 	saveSettings(): Promise<void>;
-	switchToSpace(spaceId: string, method?: string): Promise<void>;
+	switchToSpace(spaceId: string, method?: string, skipSave?: boolean): Promise<void>;
 	createNewSpace(): Promise<void>;
 	openSpaceManager(): void;
 	openSettings(): void;

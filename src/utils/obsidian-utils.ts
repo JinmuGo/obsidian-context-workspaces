@@ -639,6 +639,16 @@ export function setupWorkspaceLoadMonitoring(app: App, plugin: ContextWorkspaces
 
 		// Override loadWorkspace method to detect calls
 		workspaces.instance.loadWorkspace = async (workspaceId: string) => {
+			// Detect externally-initiated loads (e.g. Obsidian's native workspace
+			// switcher): the outgoing space's layout is still on screen, so
+			// capture it now — after the load completes, saving would write the
+			// new layout into the wrong (outgoing) workspace.
+			const isExternalLoad =
+				workspaceId !== plugin.settings.currentSpaceId && !plugin.switchingToSpaceId;
+			if (isExternalLoad) {
+				plugin.saveCurrentSpaceState();
+			}
+
 			// Call original method first
 			await originalLoadWorkspace(workspaceId);
 
@@ -647,9 +657,11 @@ export function setupWorkspaceLoadMonitoring(app: App, plugin: ContextWorkspaces
 			const currentSpaceId = plugin.settings.currentSpaceId;
 
 			if (spaceExists && workspaceId !== currentSpaceId) {
-				// Switch to the corresponding Context Space
+				// Switch to the corresponding Context Space. skipSave: the
+				// outgoing space was already saved above, and the new layout is
+				// already on screen.
 				window.setTimeout(() => {
-					void plugin.switchToSpace(workspaceId).catch((error) => {
+					void plugin.switchToSpace(workspaceId, 'native', true).catch((error) => {
 						console.error('Failed to auto-switch to Context Space:', error);
 					});
 				}, 100); // Small delay to ensure workspace is fully loaded

@@ -1,5 +1,5 @@
 import { Menu, Notice, Plugin, type TFile } from 'obsidian';
-import type { ContextWorkspacesSettings } from './types';
+import type { ContextWorkspacesSettings, PendingSpaceRequest } from './types';
 import { DEFAULT_SETTINGS } from './types';
 import { needsDeletionDetection, safeDeletionDetection } from './utils/deletion-detection-utils';
 import {
@@ -40,6 +40,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 	layoutChangeTimeout: number;
 	workspaceChangeTimeout: number;
 	switchingToSpaceId: string | null = null;
+	private pendingSpaceRequest: PendingSpaceRequest | null = null;
 	private statusBarItem: HTMLElement | null = null;
 
 	async onload() {
@@ -330,16 +331,33 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		}
 	}
 
-	async switchToSpace(spaceId: string, _method: string = 'sidebar') {
-		if (this.switchingToSpaceId || spaceId === this.settings.currentSpaceId) {
+	async switchToSpace(spaceId: string, _method: string = 'sidebar', skipSave = false) {
+		// If a switch is already in flight, queue the latest request (last-wins)
+		// instead of dropping it, so rapid switching doesn't lose key presses.
+		// The full request is queued: a native-switcher follow-up must keep
+		// skipSave, otherwise the re-invocation would save the already-loaded
+		// layout into the wrong workspace (same corruption as issue #15).
+		if (this.switchingToSpaceId) {
+			this.pendingSpaceRequest = { spaceId, method: _method, skipSave };
+			return;
+		}
+
+		if (spaceId === this.settings.currentSpaceId) {
 			return;
 		}
 
 		this.switchingToSpaceId = spaceId;
 
+		// Cancel any pending debounced auto-save: it belongs to the outgoing
+		// space and must never fire under the new space's id.
+		window.clearTimeout(this.layoutChangeTimeout);
+
 		try {
-			// Save current space state
-			this.saveCurrentSpaceState();
+			// Save current space state (skipped when the workspace layout was
+			// already loaded externally, e.g. via Obsidian's native switcher)
+			if (!skipSave) {
+				this.saveCurrentSpaceState();
+			}
 
 			// Switch to new space
 			this.settings.currentSpaceId = spaceId;
@@ -398,6 +416,22 @@ export default class ContextWorkspacesPlugin extends Plugin {
 			}
 		} finally {
 			this.switchingToSpaceId = null;
+
+			// Process the queued switch request, if any (skipSave is carried
+			// through so native-switcher follow-ups never re-save)
+			const pendingSpaceRequest = this.pendingSpaceRequest;
+			this.pendingSpaceRequest = null;
+			if (
+				pendingSpaceRequest &&
+				pendingSpaceRequest.spaceId !== this.settings.currentSpaceId &&
+				this.settings.spaces[pendingSpaceRequest.spaceId]
+			) {
+				void this.switchToSpace(
+					pendingSpaceRequest.spaceId,
+					pendingSpaceRequest.method,
+					pendingSpaceRequest.skipSave
+				);
+			}
 		}
 	}
 
@@ -444,7 +478,10 @@ export default class ContextWorkspacesPlugin extends Plugin {
 	}
 
 	switchToNextSpace() {
-		const currentIndex = this.settings.spaceOrder.indexOf(this.settings.currentSpaceId);
+		// Compute from the queued target when a switch is in flight, so rapid
+		// repeated presses advance correctly (and skip intermediate loads).
+		const baseId = this.pendingSpaceRequest?.spaceId ?? this.settings.currentSpaceId;
+		const currentIndex = this.settings.spaceOrder.indexOf(baseId);
 		const nextIndex = (currentIndex + 1) % this.settings.spaceOrder.length;
 		const nextSpaceId = this.settings.spaceOrder[nextIndex];
 
@@ -454,7 +491,8 @@ export default class ContextWorkspacesPlugin extends Plugin {
 	}
 
 	switchToPreviousSpace() {
-		const currentIndex = this.settings.spaceOrder.indexOf(this.settings.currentSpaceId);
+		const baseId = this.pendingSpaceRequest?.spaceId ?? this.settings.currentSpaceId;
+		const currentIndex = this.settings.spaceOrder.indexOf(baseId);
 		const prevIndex =
 			currentIndex <= 0 ? this.settings.spaceOrder.length - 1 : currentIndex - 1;
 		const prevSpaceId = this.settings.spaceOrder[prevIndex];
@@ -584,16 +622,27 @@ export default class ContextWorkspacesPlugin extends Plugin {
 
 	handleLayoutChange() {
 		// Auto-save current space state if auto-save is enabled
-		if (!this.switchingToSpaceId) {
-			const currentSpace = this.settings.spaces[this.settings.currentSpaceId];
-			if (currentSpace?.autoSave) {
-				// Debounce to avoid excessive saves
-				window.clearTimeout(this.layoutChangeTimeout);
-				this.layoutChangeTimeout = window.setTimeout(() => {
-					this.saveCurrentSpaceState();
-				}, 500);
-			}
+		if (this.switchingToSpaceId) {
+			return;
 		}
+
+		const spaceId = this.settings.currentSpaceId;
+		const currentSpace = this.settings.spaces[spaceId];
+		if (!currentSpace?.autoSave) {
+			return;
+		}
+
+		// Debounce to avoid excessive saves
+		window.clearTimeout(this.layoutChangeTimeout);
+		this.layoutChangeTimeout = window.setTimeout(() => {
+			// Re-validate at fire time: never save while a switch is in flight,
+			// and never write this layout into a different space than the one
+			// it was scheduled for.
+			if (this.switchingToSpaceId || this.settings.currentSpaceId !== spaceId) {
+				return;
+			}
+			this.saveCurrentSpaceState();
+		}, 500);
 	}
 
 	handleFileOpen(_file: TFile) {
