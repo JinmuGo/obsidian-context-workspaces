@@ -40,6 +40,12 @@ export default class ContextWorkspacesPlugin extends Plugin {
 	layoutChangeTimeout: number;
 	workspaceChangeTimeout: number;
 	switchingToSpaceId: string | null = null;
+	// The persisted current id may be stale after a plugin reload, so this is
+	// populated only after a workspace load has established what is visible.
+	loadedWorkspaceId: string | null = null;
+	internalWorkspaceLoadId: string | null = null;
+	workspaceLoadInProgress = 0;
+	workspaceLoadGeneration = 0;
 	private pendingSpaceRequest: PendingSpaceRequest | null = null;
 	private statusBarItem: HTMLElement | null = null;
 
@@ -167,6 +173,10 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		// Clear timeouts
 		window.clearTimeout(this.layoutChangeTimeout);
 		window.clearTimeout(this.workspaceChangeTimeout);
+		this.workspaceLoadGeneration += 1;
+		this.internalWorkspaceLoadId = null;
+		this.pendingSpaceRequest?.resolve(false);
+		this.pendingSpaceRequest = null;
 
 		// Drop the status bar reference (Obsidian removes the element itself)
 		this.statusBarItem = null;
@@ -331,37 +341,77 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		}
 	}
 
-	async switchToSpace(spaceId: string, _method: string = 'sidebar', skipSave = false) {
-		// If a switch is already in flight, queue the latest request (last-wins)
-		// instead of dropping it, so rapid switching doesn't lose key presses.
-		// The full request is queued: a native-switcher follow-up must keep
-		// skipSave, otherwise the re-invocation would save the already-loaded
-		// layout into the wrong workspace (same corruption as issue #15).
-		if (this.switchingToSpaceId) {
-			this.pendingSpaceRequest = { spaceId, method: _method, skipSave };
-			return;
+	async switchToSpace(
+		spaceId: string,
+		_method: string = 'sidebar',
+		skipSave = false,
+		workspaceAlreadyLoaded = false,
+		nativeLoadGeneration?: number,
+	): Promise<boolean> {
+		// Native callbacks carry their generation so they can only apply the load
+		// that produced them.
+		if (nativeLoadGeneration !== undefined) {
+			if (nativeLoadGeneration !== this.workspaceLoadGeneration) {
+				return false;
+			}
 		}
 
-		if (spaceId === this.settings.currentSpaceId) {
-			return;
+		if (!this.settings.spaces[spaceId]) {
+			return false;
+		}
+
+		const loadedWorkspaceId = this.loadedWorkspaceId ?? this.settings.currentSpaceId;
+		const isAlreadyActive =
+			this.loadedWorkspaceId !== null &&
+			spaceId === this.settings.currentSpaceId &&
+			loadedWorkspaceId === spaceId &&
+			this.workspaceLoadInProgress === 0 &&
+			this.switchingToSpaceId === null;
+		if (isAlreadyActive && !workspaceAlreadyLoaded) {
+			return true;
+		}
+
+		// A real request supersedes delayed native callbacks. Do this after the
+		// no-op check so a duplicate click does not invalidate an active load.
+		if (nativeLoadGeneration === undefined) {
+			this.workspaceLoadGeneration += 1;
+		}
+
+		if (this.switchingToSpaceId) {
+			this.pendingSpaceRequest?.resolve(false);
+			return new Promise<boolean>((resolve) => {
+				this.pendingSpaceRequest = {
+					spaceId,
+					method: _method,
+					skipSave,
+					workspaceAlreadyLoaded,
+					nativeLoadGeneration,
+					resolve,
+				};
+			});
 		}
 
 		this.switchingToSpaceId = spaceId;
-
-		// Cancel any pending debounced auto-save: it belongs to the outgoing
-		// space and must never fire under the new space's id.
-		window.clearTimeout(this.layoutChangeTimeout);
+		this.cancelPendingLayoutSave();
+		let switchSucceeded = false;
 
 		try {
-			// Save current space state (skipped when the workspace layout was
-			// already loaded externally, e.g. via Obsidian's native switcher)
+			// Save the workspace that is actually visible, not just the logical
+			// currentSpaceId. Native loads can temporarily make these differ.
 			if (!skipSave) {
 				this.saveCurrentSpaceState();
 			}
 
-			// Switch to new space
+			// A native load already put this workspace on screen. Avoid loading it
+			// a second time and racing the native switcher.
+			if (!workspaceAlreadyLoaded) {
+				await this.loadSpaceState(spaceId);
+			}
+
+			this.loadedWorkspaceId = spaceId;
 			this.settings.currentSpaceId = spaceId;
 			await this.saveSettings();
+			switchSucceeded = true;
 
 			// Reflect the new current space in the status bar
 			this.updateStatusBar();
@@ -381,16 +431,13 @@ export default class ContextWorkspacesPlugin extends Plugin {
 					}
 				}
 			} else {
-				// If no theme is configured for this space, restore to original Obsidian theme
+				// If no theme is configured for this space, restore to the original theme
 				try {
 					await restoreThemeState(this.app);
 				} catch (restoreError) {
 					console.error('Failed to restore original theme:', restoreError);
 				}
 			}
-
-			// Load new space state
-			await this.loadSpaceState(spaceId);
 
 			// Update sidebar safely with delay to ensure state is stable
 			window.setTimeout(() => {
@@ -408,7 +455,8 @@ export default class ContextWorkspacesPlugin extends Plugin {
 			}
 		} catch (error) {
 			console.error(`Failed to switch to space ${spaceId}:`, error);
-			// If switching fails, try to restore theme state
+			// currentSpaceId remains unchanged when loading fails, so future saves
+			// continue to target the workspace that is still visible.
 			try {
 				await restoreThemeState(this.app);
 			} catch (restoreError) {
@@ -417,22 +465,32 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		} finally {
 			this.switchingToSpaceId = null;
 
-			// Process the queued switch request, if any (skipSave is carried
-			// through so native-switcher follow-ups never re-save)
 			const pendingSpaceRequest = this.pendingSpaceRequest;
 			this.pendingSpaceRequest = null;
+			const pendingSpaceIsActive =
+			this.loadedWorkspaceId !== null &&
+				pendingSpaceRequest?.spaceId === this.settings.currentSpaceId &&
+				(this.loadedWorkspaceId ?? this.settings.currentSpaceId) ===
+					pendingSpaceRequest?.spaceId &&
+				this.workspaceLoadInProgress === 0;
 			if (
 				pendingSpaceRequest &&
-				pendingSpaceRequest.spaceId !== this.settings.currentSpaceId &&
+				!pendingSpaceIsActive &&
 				this.settings.spaces[pendingSpaceRequest.spaceId]
 			) {
 				void this.switchToSpace(
 					pendingSpaceRequest.spaceId,
 					pendingSpaceRequest.method,
-					pendingSpaceRequest.skipSave
-				);
+					pendingSpaceRequest.skipSave,
+					pendingSpaceRequest.workspaceAlreadyLoaded,
+					pendingSpaceRequest.nativeLoadGeneration,
+				).then(pendingSpaceRequest.resolve, () => pendingSpaceRequest.resolve(false));
+			} else {
+				pendingSpaceRequest?.resolve(pendingSpaceIsActive);
 			}
 		}
+
+		return switchSucceeded;
 	}
 
 	// Handle space order changes from DnD
@@ -451,18 +509,16 @@ export default class ContextWorkspacesPlugin extends Plugin {
 	}
 
 	saveCurrentSpaceState() {
-		const currentSpaceId = this.settings.currentSpaceId;
-		const currentSpace = this.settings.spaces[currentSpaceId];
-
-		if (!currentSpace || !currentSpace.autoSave) {
+		const loadedWorkspaceId = this.loadedWorkspaceId;
+		if (!loadedWorkspaceId) {
 			return;
 		}
 
-		try {
-			saveWorkspaceState(this.app, currentSpaceId);
-		} catch (error) {
-			console.error('Failed to save workspace state:', error);
-		}
+		this.saveSpaceState(loadedWorkspaceId);
+	}
+
+	cancelPendingLayoutSave() {
+		window.clearTimeout(this.layoutChangeTimeout);
 	}
 
 	async loadSpaceState(spaceId: string) {
@@ -471,16 +527,27 @@ export default class ContextWorkspacesPlugin extends Plugin {
 
 		try {
 			// Load workspace state (this will automatically open pinned tabs)
+			this.internalWorkspaceLoadId = spaceId;
 			await loadWorkspaceState(this.app, spaceId);
 		} catch (error) {
 			console.error('Failed to load workspace state:', error);
+			throw error;
+		} finally {
+			if (this.internalWorkspaceLoadId === spaceId) {
+				this.internalWorkspaceLoadId = null;
+			}
 		}
 	}
 
 	switchToNextSpace() {
-		// Compute from the queued target when a switch is in flight, so rapid
-		// repeated presses advance correctly (and skip intermediate loads).
-		const baseId = this.pendingSpaceRequest?.spaceId ?? this.settings.currentSpaceId;
+		// Compute from the latest requested target, even before its layout finishes
+		// loading, so rapid repeated presses advance one space at a time.
+		const baseId =
+			this.pendingSpaceRequest?.spaceId ??
+			this.switchingToSpaceId ??
+			(this.loadedWorkspaceId && this.settings.spaces[this.loadedWorkspaceId]
+				? this.loadedWorkspaceId
+				: this.settings.currentSpaceId);
 		const currentIndex = this.settings.spaceOrder.indexOf(baseId);
 		const nextIndex = (currentIndex + 1) % this.settings.spaceOrder.length;
 		const nextSpaceId = this.settings.spaceOrder[nextIndex];
@@ -491,7 +558,12 @@ export default class ContextWorkspacesPlugin extends Plugin {
 	}
 
 	switchToPreviousSpace() {
-		const baseId = this.pendingSpaceRequest?.spaceId ?? this.settings.currentSpaceId;
+		const baseId =
+			this.pendingSpaceRequest?.spaceId ??
+			this.switchingToSpaceId ??
+			(this.loadedWorkspaceId && this.settings.spaces[this.loadedWorkspaceId]
+				? this.loadedWorkspaceId
+				: this.settings.currentSpaceId);
 		const currentIndex = this.settings.spaceOrder.indexOf(baseId);
 		const prevIndex =
 			currentIndex <= 0 ? this.settings.spaceOrder.length - 1 : currentIndex - 1;
@@ -622,11 +694,15 @@ export default class ContextWorkspacesPlugin extends Plugin {
 
 	handleLayoutChange() {
 		// Auto-save current space state if auto-save is enabled
-		if (this.switchingToSpaceId) {
+		if (this.switchingToSpaceId || this.workspaceLoadInProgress > 0) {
 			return;
 		}
 
-		const spaceId = this.settings.currentSpaceId;
+		const spaceId = this.loadedWorkspaceId;
+		if (!spaceId) {
+			return;
+		}
+
 		const currentSpace = this.settings.spaces[spaceId];
 		if (!currentSpace?.autoSave) {
 			return;
@@ -636,13 +712,30 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		window.clearTimeout(this.layoutChangeTimeout);
 		this.layoutChangeTimeout = window.setTimeout(() => {
 			// Re-validate at fire time: never save while a switch is in flight,
-			// and never write this layout into a different space than the one
-			// it was scheduled for.
-			if (this.switchingToSpaceId || this.settings.currentSpaceId !== spaceId) {
+			// and never write this layout into a different visible workspace than
+			// the one it was scheduled for.
+			if (
+				this.switchingToSpaceId ||
+				this.workspaceLoadInProgress > 0 ||
+				(this.loadedWorkspaceId ?? this.settings.currentSpaceId) !== spaceId
+			) {
 				return;
 			}
-			this.saveCurrentSpaceState();
+			this.saveSpaceState(spaceId);
 		}, 500);
+	}
+
+	private saveSpaceState(spaceId: string) {
+		const space = this.settings.spaces[spaceId];
+		if (!space?.autoSave) {
+			return;
+		}
+
+		try {
+			saveWorkspaceState(this.app, spaceId);
+		} catch (error) {
+			console.error('Failed to save workspace state:', error);
+		}
 	}
 
 	handleFileOpen(_file: TFile) {

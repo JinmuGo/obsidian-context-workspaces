@@ -330,22 +330,12 @@ export const SidebarManager: React.FC<SidebarManagerProps> = ({ plugin }) => {
 
 	const handlePreviousSpace = () => {
 		if (!isMountedRef.current) return;
-		// Find current space index and switch to previous
-		const currentIndex = spaceOrder.indexOf(currentSpaceId);
-		if (currentIndex > 0) {
-			const previousSpaceId = spaceOrder[currentIndex - 1];
-			void plugin.switchToSpace(previousSpaceId);
-		}
+		plugin.switchToPreviousSpace();
 	};
 
 	const handleNextSpace = () => {
 		if (!isMountedRef.current) return;
-		// Find current space index and switch to next
-		const currentIndex = spaceOrder.indexOf(currentSpaceId);
-		if (currentIndex < spaceOrder.length - 1) {
-			const nextSpaceId = spaceOrder[currentIndex + 1];
-			void plugin.switchToSpace(nextSpaceId);
-		}
+		plugin.switchToNextSpace();
 	};
 
 	const handleCreateNewSpace = () => {

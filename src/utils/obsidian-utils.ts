@@ -52,9 +52,15 @@ export function saveWorkspaceState(app: App, workspaceId: string): void {
 export async function loadWorkspaceState(app: App, workspaceId: string): Promise<void> {
 	try {
 		const workspaces = getWorkspacesPlugin(app);
-		if (workspaces?.enabled && workspaces.instance?.workspaces[workspaceId]) {
-			await workspaces.instance.loadWorkspace(workspaceId);
+		if (!workspaces?.enabled || !workspaces.instance) {
+			throw new Error('Obsidian workspaces plugin is unavailable');
 		}
+
+		if (!workspaces.instance.workspaces[workspaceId]) {
+			throw new Error(`Obsidian workspace not found: ${workspaceId}`);
+		}
+
+		await workspaces.instance.loadWorkspace(workspaceId);
 	} catch (error) {
 		console.error('Failed to load workspace state:', error);
 		throw error;
@@ -636,36 +642,76 @@ export function setupWorkspaceLoadMonitoring(app: App, plugin: ContextWorkspaces
 			workspaces.instance,
 		) as (id: string) => Promise<void>;
 		workspaces.instance._originalLoadWorkspace = originalLoadWorkspace;
+		let workspaceLoadQueue: Promise<void> = Promise.resolve();
 
 		// Override loadWorkspace method to detect calls
-		workspaces.instance.loadWorkspace = async (workspaceId: string) => {
-			// Detect externally-initiated loads (e.g. Obsidian's native workspace
-			// switcher): the outgoing space's layout is still on screen, so
-			// capture it now — after the load completes, saving would write the
-			// new layout into the wrong (outgoing) workspace.
-			const isExternalLoad =
-				workspaceId !== plugin.settings.currentSpaceId && !plugin.switchingToSpaceId;
-			if (isExternalLoad) {
-				plugin.saveCurrentSpaceState();
+		workspaces.instance.loadWorkspace = (workspaceId: string) => {
+			const isPluginInitiatedLoad = plugin.internalWorkspaceLoadId === workspaceId;
+			if (isPluginInitiatedLoad) {
+				plugin.internalWorkspaceLoadId = null;
 			}
 
-			// Call original method first
-			await originalLoadWorkspace(workspaceId);
+			const queuedLoad = workspaceLoadQueue.then(async () => {
+				// Detect externally-initiated loads (e.g. Obsidian's native workspace
+				// switcher): the outgoing space's layout is still on screen, so
+				// capture it now — after the load completes, saving would write the
+				// new layout into the wrong (outgoing) workspace.
+				const visibleWorkspaceId =
+					plugin.loadedWorkspaceId ?? plugin.settings.currentSpaceId;
+				const isExternalLoad =
+					!isPluginInitiatedLoad &&
+					(plugin.loadedWorkspaceId === null || workspaceId !== visibleWorkspaceId);
+				const loadGeneration = isExternalLoad
+					? ++plugin.workspaceLoadGeneration
+					: plugin.workspaceLoadGeneration;
 
-			// Check if this workspace corresponds to a Context Space
-			const spaceExists = plugin.settings.spaces[workspaceId];
-			const currentSpaceId = plugin.settings.currentSpaceId;
+				plugin.cancelPendingLayoutSave();
+				if (isExternalLoad) {
+					plugin.saveCurrentSpaceState();
+				}
 
-			if (spaceExists && workspaceId !== currentSpaceId) {
-				// Switch to the corresponding Context Space. skipSave: the
-				// outgoing space was already saved above, and the new layout is
-				// already on screen.
-				window.setTimeout(() => {
-					void plugin.switchToSpace(workspaceId, 'native', true).catch((error) => {
-						console.error('Failed to auto-switch to Context Space:', error);
-					});
-				}, 100); // Small delay to ensure workspace is fully loaded
-			}
+				plugin.workspaceLoadInProgress += 1;
+				try {
+					// Call original method first.
+					await originalLoadWorkspace(workspaceId);
+
+					// Loads are serialized above, so the completed load is the workspace
+					// actually on screen even if a newer request is waiting behind it.
+					plugin.loadedWorkspaceId = workspaceId;
+
+					const spaceExists = plugin.settings.spaces[workspaceId];
+					if (
+						isExternalLoad &&
+						spaceExists &&
+						plugin.workspaceLoadGeneration === loadGeneration
+					) {
+						// The layout is already loaded. Adopt it without loading it again,
+						// and ignore the callback if a newer transition supersedes it.
+						window.setTimeout(() => {
+							if (
+								plugin.workspaceLoadGeneration !== loadGeneration ||
+								plugin.loadedWorkspaceId !== workspaceId
+							) {
+								return;
+							}
+
+							void plugin
+								.switchToSpace(workspaceId, 'native', true, true, loadGeneration)
+								.catch((error) => {
+									console.error('Failed to auto-switch to Context Space:', error);
+								});
+						}, 100);
+					}
+				} finally {
+					plugin.workspaceLoadInProgress = Math.max(
+						0,
+						plugin.workspaceLoadInProgress - 1,
+					);
+				}
+			});
+
+			workspaceLoadQueue = queuedLoad.catch(() => undefined);
+			return queuedLoad;
 		};
 	} catch (error) {
 		console.error('Failed to setup workspace load monitoring:', error);

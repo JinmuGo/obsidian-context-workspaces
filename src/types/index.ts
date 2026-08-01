@@ -91,14 +91,28 @@ export interface PendingSpaceRequest {
 	spaceId: string;
 	method: string;
 	skipSave: boolean;
+	workspaceAlreadyLoaded: boolean;
+	nativeLoadGeneration?: number;
+	resolve: (switched: boolean) => void;
 }
 
 // Context Workspaces plugin-like interface
 export interface ContextWorkspacesPluginLike {
 	settings: { spaces: Record<string, unknown>; currentSpaceId: string };
 	switchingToSpaceId: string | null;
-	switchToSpace: (spaceId: string, method?: string, skipSave?: boolean) => Promise<void>;
+	loadedWorkspaceId: string | null;
+	internalWorkspaceLoadId: string | null;
+	workspaceLoadInProgress: number;
+	workspaceLoadGeneration: number;
+	switchToSpace: (
+		spaceId: string,
+		method?: string,
+		skipSave?: boolean,
+		workspaceAlreadyLoaded?: boolean,
+		nativeLoadGeneration?: number,
+	) => Promise<boolean>;
 	saveCurrentSpaceState: () => void;
+	cancelPendingLayoutSave: () => void;
 }
 
 // ===== Existing Type Definitions =====
@@ -136,7 +150,15 @@ export interface ContextWorkspacesPlugin {
 	app: unknown; // Obsidian App instance
 	settings: ContextWorkspacesSettings;
 	saveSettings(): Promise<void>;
-	switchToSpace(spaceId: string, method?: string, skipSave?: boolean): Promise<void>;
+	switchToSpace(
+		spaceId: string,
+		method?: string,
+		skipSave?: boolean,
+		workspaceAlreadyLoaded?: boolean,
+		nativeLoadGeneration?: number,
+	): Promise<boolean>;
+	switchToNextSpace(): void;
+	switchToPreviousSpace(): void;
 	createNewSpace(): Promise<void>;
 	openSpaceManager(): void;
 	openSettings(): void;

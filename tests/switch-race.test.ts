@@ -78,6 +78,7 @@ function createPlugin(app: App): ContextWorkspacesPlugin {
 		spaceOrder: ['A', 'B', 'C'],
 		currentSpaceId: 'A',
 	};
+	plugin.loadedWorkspaceId = 'A';
 	return plugin;
 }
 
@@ -122,8 +123,9 @@ describe('Space switching race conditions (issue #15)', () => {
 
 		plugin.handleLayoutChange(); // scheduled under A
 
-		// Simulate currentSpaceId changing without switchToSpace (defense-in-depth)
+		// Simulate the visible workspace changing without switchToSpace
 		plugin.settings.currentSpaceId = 'B';
+		plugin.loadedWorkspaceId = 'B';
 
 		jest.advanceTimersByTime(600);
 		expect(instance.saveWorkspace).not.toHaveBeenCalled();
@@ -164,11 +166,12 @@ describe('Space switching race conditions (issue #15)', () => {
 		expect(resolveLoad).toBeDefined();
 
 		// Second switch arrives while the first is in flight → queued
-		void plugin.switchToSpace('C');
+		const second = plugin.switchToSpace('C');
 
 		resolveLoad?.();
-		await first;
+		expect(await first).toBe(true);
 		await flushMicrotasks();
+		expect(await second).toBe(true);
 
 		expect(plugin.settings.currentSpaceId).toBe('C');
 		// Outgoing saves happened in order: A's layout into A, then B's into B
@@ -232,6 +235,203 @@ describe('Space switching race conditions (issue #15)', () => {
 		expect(plugin.settings.currentSpaceId).toBe('B');
 		// skipSave: the already-loaded layout must not be re-saved into any workspace
 		expect(instance.saveWorkspace).toHaveBeenCalledTimes(1);
+	});
+
+	test('native load cancels a pending auto-save while the load is in flight', async () => {
+		const { app, instance } = createMockApp();
+		const plugin = createPlugin(app);
+
+		plugin.handleLayoutChange();
+
+		let resolveLoad: (() => void) | undefined;
+		instance.loadWorkspace.mockImplementationOnce(
+			() =>
+				new Promise<void>((resolve) => {
+					resolveLoad = resolve;
+				}),
+		);
+		setupWorkspaceLoadMonitoring(app, plugin);
+
+		const loadPromise = instance.loadWorkspace('B');
+		for (let i = 0; i < 25 && !resolveLoad; i++) {
+			await Promise.resolve();
+		}
+		expect(resolveLoad).toBeDefined();
+
+		// The timer scheduled for A must not save while B is loading.
+		jest.advanceTimersByTime(600);
+		await flushMicrotasks();
+		expect(instance.saveWorkspace).toHaveBeenCalledTimes(1);
+		expect(instance.saveWorkspace).toHaveBeenCalledWith('A');
+
+		resolveLoad?.();
+		await loadPromise;
+		jest.advanceTimersByTime(150);
+		await flushMicrotasks();
+		expect(plugin.settings.currentSpaceId).toBe('B');
+		expect(instance.saveWorkspace).toHaveBeenCalledTimes(1);
+	});
+
+	test('stale native follow-up cannot override a newer user switch', async () => {
+		const { app, instance } = createMockApp();
+		const plugin = createPlugin(app);
+		const originalLoadMock = instance.loadWorkspace;
+		setupWorkspaceLoadMonitoring(app, plugin);
+
+		await instance.loadWorkspace('B');
+
+		// Switch to C before B's delayed native follow-up runs.
+		await plugin.switchToSpace('C');
+		jest.advanceTimersByTime(150);
+		await flushMicrotasks();
+
+		expect(plugin.settings.currentSpaceId).toBe('C');
+		expect(originalLoadMock.mock.calls.map((call) => call[0])).toEqual(['B', 'C']);
+		expect(instance.saveWorkspace.mock.calls.map((call) => call[0])).toEqual(['A', 'B']);
+	});
+
+	test('selecting the logical current space reconciles a native-loaded layout', async () => {
+		const { app, instance } = createMockApp();
+		const plugin = createPlugin(app);
+		const originalLoadMock = instance.loadWorkspace;
+		setupWorkspaceLoadMonitoring(app, plugin);
+
+		await instance.loadWorkspace('B');
+		expect(await plugin.switchToSpace('A')).toBe(true);
+		jest.advanceTimersByTime(150);
+		await flushMicrotasks();
+
+		expect(plugin.settings.currentSpaceId).toBe('A');
+		expect(originalLoadMock.mock.calls.map((call) => call[0])).toEqual(['B', 'A']);
+		expect(instance.saveWorkspace.mock.calls.map((call) => call[0])).toEqual(['A', 'B']);
+	});
+
+	test('native load saves the actually visible workspace when logical state differs', async () => {
+		const { app, instance } = createMockApp();
+		const plugin = createPlugin(app);
+		setupWorkspaceLoadMonitoring(app, plugin);
+
+		await instance.loadWorkspace('B');
+		await instance.loadWorkspace('A');
+
+		expect(plugin.settings.currentSpaceId).toBe('A');
+		expect(plugin.loadedWorkspaceId).toBe('A');
+		expect(instance.saveWorkspace.mock.calls.map((call) => call[0])).toEqual(['A', 'B']);
+	});
+
+	test('native workspace loads are serialized', async () => {
+		const { app, instance } = createMockApp();
+		const plugin = createPlugin(app);
+		const originalLoadMock = instance.loadWorkspace;
+		let resolveFirstLoad: (() => void) | undefined;
+		instance.loadWorkspace.mockImplementationOnce(
+			() =>
+				new Promise<void>((resolve) => {
+					resolveFirstLoad = resolve;
+				}),
+		);
+		setupWorkspaceLoadMonitoring(app, plugin);
+
+		const firstLoad = instance.loadWorkspace('B');
+		for (let i = 0; i < 25 && !resolveFirstLoad; i++) {
+			await Promise.resolve();
+		}
+		expect(resolveFirstLoad).toBeDefined();
+
+		const secondLoad = instance.loadWorkspace('C');
+		expect(originalLoadMock.mock.calls.map((call) => call[0])).toEqual(['B']);
+
+		resolveFirstLoad?.();
+		await firstLoad;
+		await secondLoad;
+		jest.advanceTimersByTime(150);
+		await flushMicrotasks();
+
+		expect(originalLoadMock.mock.calls.map((call) => call[0])).toEqual(['B', 'C']);
+		expect(plugin.settings.currentSpaceId).toBe('C');
+	});
+
+	test('missing workspace load leaves the current space unchanged', async () => {
+		const { app, instance } = createMockApp();
+		const plugin = createPlugin(app);
+		delete instance.workspaces.B;
+
+		await plugin.switchToSpace('B');
+
+		expect(plugin.settings.currentSpaceId).toBe('A');
+		expect(plugin.loadedWorkspaceId).toBe('A');
+		expect(instance.saveWorkspace).toHaveBeenCalledTimes(1);
+		expect(instance.saveWorkspace).toHaveBeenCalledWith('A');
+	});
+
+	test('superseded queued switch reports that it was not executed', async () => {
+		const { app, instance } = createMockApp();
+		const plugin = createPlugin(app);
+
+		let resolveLoad: (() => void) | undefined;
+		instance.loadWorkspace.mockImplementationOnce(
+			() =>
+				new Promise<void>((resolve) => {
+					resolveLoad = resolve;
+				}),
+		);
+
+		const first = plugin.switchToSpace('B');
+		for (let i = 0; i < 25 && !resolveLoad; i++) {
+			await Promise.resolve();
+		}
+		const superseded = plugin.switchToSpace('C');
+		const replacement = plugin.switchToSpace('A');
+
+		expect(await superseded).toBe(false);
+		resolveLoad?.();
+		expect(await first).toBe(true);
+		expect(await replacement).toBe(true);
+		expect(plugin.settings.currentSpaceId).toBe('A');
+	});
+
+	test('failed load does not save the visible layout into the failed target', async () => {
+		const { app, instance } = createMockApp();
+		const plugin = createPlugin(app);
+
+		let rejectLoad: ((error: Error) => void) | undefined;
+		instance.loadWorkspace.mockImplementationOnce(
+			() =>
+				new Promise<void>((_resolve, reject) => {
+					rejectLoad = reject;
+				}),
+		);
+
+		const first = plugin.switchToSpace('B');
+		for (let i = 0; i < 25 && !rejectLoad; i++) {
+			await Promise.resolve();
+		}
+		expect(rejectLoad).toBeDefined();
+
+		const queued = plugin.switchToSpace('C');
+		rejectLoad?.(new Error('workspace load failed'));
+		expect(await first).toBe(false);
+		expect(await queued).toBe(true);
+
+		expect(plugin.settings.currentSpaceId).toBe('C');
+		expect(instance.saveWorkspace).not.toHaveBeenCalledWith('B');
+		expect(instance.loadWorkspace).toHaveBeenCalledWith('C');
+	});
+
+	test('unknown native workspace cannot trigger an auto-save into the current space', async () => {
+		const { app, instance } = createMockApp();
+		const plugin = createPlugin(app);
+		setupWorkspaceLoadMonitoring(app, plugin);
+
+		await instance.loadWorkspace('unknown');
+		plugin.handleLayoutChange();
+		jest.advanceTimersByTime(600);
+		await flushMicrotasks();
+
+		expect(plugin.loadedWorkspaceId).toBe('unknown');
+		expect(plugin.settings.currentSpaceId).toBe('A');
+		expect(instance.saveWorkspace).toHaveBeenCalledTimes(1);
+		expect(instance.saveWorkspace).toHaveBeenCalledWith('A');
 	});
 
 	test('queued native-switcher follow-up keeps skipSave (no save into wrong workspace)', async () => {
