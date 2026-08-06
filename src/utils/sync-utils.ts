@@ -20,6 +20,10 @@ export interface SyncResult {
 	}>;
 }
 
+function hasWorkspaceHistory(settings: ContextWorkspacesSettings, spaceId: string): boolean {
+	return settings.workspaceLastSeen?.[spaceId] !== undefined;
+}
+
 /**
  * Function to perform bidirectional synchronization
  */
@@ -35,7 +39,23 @@ export async function performBidirectionalSync(
 	};
 
 	try {
-		const obsidianWorkspaceNames = getObsidianWorkspaceNames(app);
+		const registry = getObsidianWorkspaceNames(app);
+		if (registry.status === 'unavailable') {
+			result.errors.push({ workspaceId: 'registry', error: registry.error });
+			return result;
+		}
+
+		const obsidianWorkspaceNames = registry.names;
+		const hasKnownSpaces = Object.keys(settings.spaces).some(
+			(spaceId) => spaceId !== 'default' && hasWorkspaceHistory(settings, spaceId),
+		);
+		if (Object.keys(obsidianWorkspaceNames).length === 0 && hasKnownSpaces) {
+			result.errors.push({
+				workspaceId: 'registry',
+				error: 'Workspace registry is empty; synchronization deferred',
+			});
+			return result;
+		}
 
 		for (const [workspaceId, workspaceName] of Object.entries(obsidianWorkspaceNames)) {
 			if (!settings.spaces[workspaceId]) {
@@ -48,6 +68,10 @@ export async function performBidirectionalSync(
 				if (!settings.spaceOrder.includes(workspaceId)) {
 					settings.spaceOrder.push(workspaceId);
 				}
+				if (!settings.workspaceLastSeen) {
+					settings.workspaceLastSeen = {};
+				}
+				settings.workspaceLastSeen[workspaceId] = Date.now();
 
 				result.importedFromObsidian.push(workspaceId);
 			} else {
@@ -70,10 +94,18 @@ export async function performBidirectionalSync(
 
 		// Step 2: Context Workspaces → Obsidian synchronization
 		for (const spaceId of Object.keys(settings.spaces)) {
-			if (!obsidianWorkspaceNames[spaceId]) {
+			if (
+				spaceId !== 'default' &&
+				!obsidianWorkspaceNames[spaceId] &&
+				!hasWorkspaceHistory(settings, spaceId)
+			) {
 				try {
 					await createObsidianWorkspace(app, spaceId, settings.spaces[spaceId].name);
 					result.createdInObsidian.push(spaceId);
+					if (!settings.workspaceLastSeen) {
+						settings.workspaceLastSeen = {};
+					}
+					settings.workspaceLastSeen[spaceId] = Date.now();
 				} catch (error) {
 					result.errors.push({
 						workspaceId: spaceId,
@@ -124,7 +156,18 @@ export function notifySyncResult(result: SyncResult): void {
  * Function to check if synchronization is needed
  */
 export function needsSync(app: App, settings: ContextWorkspacesSettings): boolean {
-	const obsidianWorkspaceNames = getObsidianWorkspaceNames(app);
+	const registry = getObsidianWorkspaceNames(app);
+	if (registry.status === 'unavailable') {
+		return false;
+	}
+
+	const obsidianWorkspaceNames = registry.names;
+	const hasKnownSpaces = Object.keys(settings.spaces).some(
+		(spaceId) => spaceId !== 'default' && hasWorkspaceHistory(settings, spaceId),
+	);
+	if (Object.keys(obsidianWorkspaceNames).length === 0 && hasKnownSpaces) {
+		return false;
+	}
 
 	// Check if there are workspaces only in Obsidian
 	for (const workspaceId of Object.keys(obsidianWorkspaceNames)) {
@@ -134,7 +177,7 @@ export function needsSync(app: App, settings: ContextWorkspacesSettings): boolea
 	}
 
 	for (const spaceId of Object.keys(settings.spaces)) {
-		if (!obsidianWorkspaceNames[spaceId]) {
+		if (spaceId !== 'default' && !obsidianWorkspaceNames[spaceId]) {
 			return true;
 		}
 	}

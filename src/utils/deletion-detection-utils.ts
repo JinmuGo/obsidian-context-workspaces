@@ -9,94 +9,148 @@ export interface DeletionDetectionResult {
 	deletedWorkspaces: string[];
 	currentWorkspaceDeleted: boolean;
 	needsCurrentWorkspaceSwitch: boolean;
+	registryAvailable: boolean;
+	settingsChanged: boolean;
 	errors: Array<{
 		workspaceId: string;
 		error: string;
 	}>;
 }
 
-/**
- * Function to detect and handle workspace deletions
- */
-export function detectAndHandleWorkspaceDeletions(
-	app: App,
-	settings: ContextWorkspacesSettings
-): DeletionDetectionResult {
-	const result: DeletionDetectionResult = {
+function createResult(registryAvailable = true): DeletionDetectionResult {
+	return {
 		deletedWorkspaces: [],
 		currentWorkspaceDeleted: false,
 		needsCurrentWorkspaceSwitch: false,
+		registryAvailable,
+		settingsChanged: false,
 		errors: [],
 	};
+}
 
-	try {
-		const obsidianWorkspaceNames = getObsidianWorkspaceNames(app);
-
-		for (const spaceId of Object.keys(settings.spaces)) {
-			if (spaceId === 'default') continue; // Exclude default workspace
-
-			if (!obsidianWorkspaceNames[spaceId]) {
-				result.deletedWorkspaces.push(spaceId);
-
-				// Check if current active workspace was deleted
-				if (spaceId === settings.currentSpaceId) {
-					result.currentWorkspaceDeleted = true;
-					result.needsCurrentWorkspaceSwitch = true;
-				}
-			}
-		}
-
-		return result;
-	} catch (error) {
-		result.errors.push({
-			workspaceId: 'detection',
-			error: error instanceof Error ? error.message : String(error),
-		});
-		console.error('Failed to detect workspace deletions:', error);
-		return result;
-	}
+function hasWorkspaceHistory(settings: ContextWorkspacesSettings, spaceId: string): boolean {
+	return settings.workspaceLastSeen?.[spaceId] !== undefined;
 }
 
 /**
- * Function to remove deleted workspaces from Context Workspaces
+ * Evaluate one trusted registry snapshot. A workspace that was previously
+ * observed in Obsidian and is now absent is deleted immediately: a trusted
+ * snapshot (available, non-empty, anchored by at least one known workspace)
+ * only reports a workspace as missing when it was actually deleted.
+ */
+export function observeWorkspaceDeletions(
+	settings: ContextWorkspacesSettings,
+	workspaceNames: Record<string, string>,
+	now = Date.now(),
+): DeletionDetectionResult {
+	const result = createResult();
+	const knownSpaceIds = Object.keys(settings.spaces).filter(
+		(spaceId) => spaceId !== 'default' && hasWorkspaceHistory(settings, spaceId),
+	);
+	// If no known workspace is present at all, the snapshot cannot be trusted
+	// (registry wipe and mass deletion are indistinguishable) - abstain.
+	if (knownSpaceIds.length > 0 && !knownSpaceIds.some((spaceId) => workspaceNames[spaceId])) {
+		return result;
+	}
+
+	for (const spaceId of Object.keys(settings.spaces)) {
+		if (spaceId === 'default') {
+			continue;
+		}
+
+		if (workspaceNames[spaceId]) {
+			if (!settings.workspaceLastSeen) {
+				settings.workspaceLastSeen = {};
+			}
+			if (settings.workspaceLastSeen[spaceId] === undefined) {
+				settings.workspaceLastSeen[spaceId] = now;
+				result.settingsChanged = true;
+			}
+			continue;
+		}
+
+		// A newly-created Context Space that was never observed in Obsidian is a
+		// creation candidate for synchronization, not a deletion candidate.
+		if (!hasWorkspaceHistory(settings, spaceId)) {
+			continue;
+		}
+
+		result.deletedWorkspaces.push(spaceId);
+		result.settingsChanged = true;
+		if (spaceId === settings.currentSpaceId) {
+			result.currentWorkspaceDeleted = true;
+			result.needsCurrentWorkspaceSwitch = true;
+		}
+	}
+
+	return result;
+}
+
+/**
+ * Detect confirmed workspace deletions from the current registry snapshot.
+ */
+export function detectAndHandleWorkspaceDeletions(
+	app: App,
+	settings: ContextWorkspacesSettings,
+): DeletionDetectionResult {
+	const registry = getObsidianWorkspaceNames(app);
+	if (registry.status !== 'available') {
+		const result = createResult(false);
+		result.errors.push({ workspaceId: 'registry', error: registry.error });
+		return result;
+	}
+
+	return observeWorkspaceDeletions(settings, registry.names);
+}
+
+/**
+ * Function to remove confirmed deleted workspaces from Context Workspaces.
  */
 export function removeDeletedWorkspaces(
 	settings: ContextWorkspacesSettings,
-	deletedWorkspaces: string[]
+	deletedWorkspaces: string[],
 ): void {
 	for (const workspaceId of deletedWorkspaces) {
-		// Remove workspace
 		delete settings.spaces[workspaceId];
 
-		// Remove from space order
 		const orderIndex = settings.spaceOrder.indexOf(workspaceId);
 		if (orderIndex !== -1) {
 			settings.spaceOrder.splice(orderIndex, 1);
 		}
+
+		if (settings.workspaceLastSeen) {
+			delete settings.workspaceLastSeen[workspaceId];
+		}
 	}
 }
 
 /**
- * Function to switch to first workspace when current workspace is deleted
+ * Function to switch to the first surviving workspace.
  */
 export function switchToFirstWorkspace(settings: ContextWorkspacesSettings): void {
-	const firstSpaceId = settings.spaceOrder[0];
-	if (firstSpaceId && settings.currentSpaceId !== firstSpaceId) {
-		settings.currentSpaceId = firstSpaceId;
+	const firstSpaceId = settings.spaceOrder.find((spaceId) => settings.spaces[spaceId]);
+	if (firstSpaceId) {
+		if (settings.currentSpaceId !== firstSpaceId) {
+			settings.currentSpaceId = firstSpaceId;
+		}
+		return;
 	}
+
+	settings.currentSpaceId = '';
 }
 
 /**
- * Function to completely handle workspace deletions
+ * Function to completely handle confirmed workspace deletions.
  */
 export function handleWorkspaceDeletions(
 	app: App,
-	settings: ContextWorkspacesSettings
+	settings: ContextWorkspacesSettings,
 ): DeletionDetectionResult {
 	const detectionResult = detectAndHandleWorkspaceDeletions(app, settings);
 
 	if (detectionResult.deletedWorkspaces.length > 0) {
 		removeDeletedWorkspaces(settings, detectionResult.deletedWorkspaces);
+		detectionResult.settingsChanged = true;
 
 		if (detectionResult.needsCurrentWorkspaceSwitch) {
 			switchToFirstWorkspace(settings);
@@ -107,30 +161,27 @@ export function handleWorkspaceDeletions(
 }
 
 export function needsDeletionDetection(app: App, settings: ContextWorkspacesSettings): boolean {
-	try {
-		const obsidianWorkspaceNames = getObsidianWorkspaceNames(app);
-
-		for (const spaceId of Object.keys(settings.spaces)) {
-			if (!obsidianWorkspaceNames[spaceId]) {
-				return true;
-			}
-		}
-
-		return false;
-	} catch (error) {
-		console.error('Failed to check if deletion detection is needed:', error);
+	const registry = getObsidianWorkspaceNames(app);
+	if (registry.status !== 'available') {
 		return false;
 	}
+
+	return Object.keys(settings.spaces).some(
+		(spaceId) =>
+			spaceId !== 'default' &&
+			hasWorkspaceHistory(settings, spaceId) &&
+			!registry.names[spaceId],
+	);
 }
 
 /**
- * Safe deletion detection function (prevents duplicate execution)
+ * Safe deletion detection function (prevents duplicate execution).
  */
 let deletionDetectionInProgress = false;
 
 export function safeDeletionDetection(
 	app: App,
-	settings: ContextWorkspacesSettings
+	settings: ContextWorkspacesSettings,
 ): DeletionDetectionResult | null {
 	if (deletionDetectionInProgress) {
 		return null;
@@ -138,9 +189,7 @@ export function safeDeletionDetection(
 
 	deletionDetectionInProgress = true;
 	try {
-		// Changed to synchronous processing (removed unnecessary Promise/setTimeout)
-		const result = handleWorkspaceDeletions(app, settings);
-		return result;
+		return handleWorkspaceDeletions(app, settings);
 	} finally {
 		deletionDetectionInProgress = false;
 	}

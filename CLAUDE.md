@@ -64,7 +64,7 @@ The plugin maintains two-way sync between Context Workspaces and Obsidian's inte
 1. **Obsidian → Context Workspaces**: Import existing workspaces as spaces on initialization
 2. **Context Workspaces → Obsidian**: Create Obsidian workspaces when new spaces are created
 3. **Change Detection**: Monitor workspace changes via `workspace-changed` event (debounced to 1 second)
-4. **Deletion Detection**: Track workspace deletions using `workspaceLastSeen` timestamps with safety checks
+4. **Deletion Detection**: Delete spaces immediately when a trusted registry snapshot shows their workspace is gone (see "Deletion Detection Safety")
 
 Key synchronization utilities in `src/utils/sync-utils.ts`:
 - `performBidirectionalSync()`: Handles two-way sync with conflict resolution
@@ -77,7 +77,7 @@ Spaces are stored in plugin settings with the following structure:
 - `spaces`: Record of space configurations (name, icon, autoSave, theme, themeMode, description)
 - `spaceOrder`: Array defining display order for DnD support
 - `currentSpaceId`: Currently active space
-- `workspaceLastSeen`: Timestamps for deletion detection (prevents false positives)
+- `workspaceLastSeen`: Marks workspaces previously observed in Obsidian (deletion eligibility; also prevents sync from resurrecting deleted workspaces)
 
 ### Auto-Save vs Snapshot Mode
 
@@ -178,8 +178,9 @@ Critical operations wrap theme/workspace changes with try-catch and restore orig
 
 ### Deletion Detection Safety
 
-Workspace deletions use multi-step verification:
-1. Check if workspace missing from Obsidian API
-2. Verify `workspaceLastSeen` timestamp (must be > 5 seconds old)
-3. Double-check by re-querying workspace
-4. Special handling for current workspace deletion
+Deletions are applied immediately, but only from a trusted registry snapshot (`WorkspaceRegistrySnapshot` in `src/types/index.ts`):
+1. Registry status must be `available` — `unavailable` (read failure) or `empty` registries abort all deletion and sync work
+2. Anchor check: at least one previously observed workspace must be present, otherwise the snapshot is indistinguishable from a registry wipe and is ignored
+3. Only spaces with a prior trusted observation (`workspaceLastSeen`) are deletion candidates — newly created spaces that were never seen in Obsidian are creation candidates for sync instead
+4. Sync never recreates an Obsidian workspace for a space that has history but is missing (prevents resurrecting deleted workspaces)
+5. Special handling for current workspace deletion (switch to a surviving space)

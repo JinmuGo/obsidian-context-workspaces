@@ -4,6 +4,7 @@ import type {
 	ObsidianAppInternal,
 	ThemeMode,
 	WorkspacesInstance,
+	WorkspaceRegistrySnapshot,
 } from '../types';
 
 /**
@@ -20,7 +21,12 @@ export function getWorkspacesPlugin(app: App): {
 	enabled?: boolean;
 	instance?: WorkspacesInstance;
 } | undefined {
-	return asInternal(app).internalPlugins.plugins.workspaces;
+	try {
+		return asInternal(app).internalPlugins.plugins.workspaces;
+	} catch (error) {
+		console.error('Failed to access Obsidian workspaces plugin:', error);
+		return undefined;
+	}
 }
 
 /**
@@ -64,9 +70,18 @@ export async function loadWorkspaceState(app: App, workspaceId: string): Promise
 /**
  * Get existing workspaces from Obsidian's internal API
  */
-export function getExistingWorkspaces(app: App): Record<string, unknown> {
-	const workspaces = getWorkspacesPlugin(app);
-	return workspaces?.instance?.workspaces ?? {};
+export function getExistingWorkspaces(app: App): Record<string, unknown> | null {
+	try {
+		const workspaces = getWorkspacesPlugin(app);
+		if (!workspaces?.enabled || !workspaces.instance?.workspaces) {
+			return null;
+		}
+
+		return workspaces.instance.workspaces;
+	} catch (error) {
+		console.error('Failed to get existing Obsidian workspaces:', error);
+		return null;
+	}
 }
 
 /**
@@ -171,20 +186,38 @@ export async function deleteObsidianWorkspace(app: App, workspaceId: string): Pr
 /**
  * Get workspace names from Obsidian's internal API
  */
-export function getObsidianWorkspaceNames(app: App): Record<string, string> {
+export function getObsidianWorkspaceNames(app: App): WorkspaceRegistrySnapshot {
 	try {
 		const workspaces = getWorkspacesPlugin(app);
-		if (workspaces?.enabled && workspaces.instance?.workspaces) {
-			const workspaceNames: Record<string, string> = {};
-			for (const [id, workspace] of Object.entries(workspaces.instance.workspaces)) {
-				workspaceNames[id] = (workspace as { name?: string }).name || id;
-			}
-			return workspaceNames;
+		if (!workspaces?.enabled || !workspaces.instance?.workspaces) {
+			return {
+				status: 'unavailable',
+				names: {},
+				error: 'Obsidian workspaces plugin is unavailable',
+			};
 		}
-		return {};
+
+		const workspaceNames: Record<string, string> = {};
+		for (const [id, workspace] of Object.entries(workspaces.instance.workspaces)) {
+			workspaceNames[id] = (workspace as { name?: string }).name || id;
+		}
+
+		if (Object.keys(workspaceNames).length === 0) {
+			return {
+				status: 'empty',
+				names: workspaceNames,
+				error: 'Obsidian workspace registry is empty',
+			};
+		}
+
+		return { status: 'available', names: workspaceNames };
 	} catch (error) {
 		console.error('Failed to get Obsidian workspace names:', error);
-		return {};
+		return {
+			status: 'unavailable',
+			names: {},
+			error: error instanceof Error ? error.message : String(error),
+		};
 	}
 }
 

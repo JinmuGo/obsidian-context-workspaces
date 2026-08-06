@@ -9,7 +9,11 @@ import { mockApp } from './mocks/obsidian';
 describe('Sync Utils tests', () => {
 	beforeEach(() => {
 		// Initialize mocking
-		mockApp.internalPlugins.plugins.workspaces.instance.workspaces = {};
+		Object.defineProperty(mockApp.internalPlugins.plugins.workspaces.instance, 'workspaces', {
+			configurable: true,
+			writable: true,
+			value: {},
+		});
 		jest.clearAllMocks();
 	});
 
@@ -44,6 +48,9 @@ describe('Sync Utils tests', () => {
 		test('Should create workspaces in Obsidian from Context Workspaces', async () => {
 			const spaceId = 'context-workspaces';
 			const spaceName = 'Context Space';
+			mockApp.internalPlugins.plugins.workspaces.instance.workspaces.existing = {
+				name: 'Existing Workspace',
+			};
 
 			// Context Workspaces settings
 			const settings = {
@@ -67,6 +74,30 @@ describe('Sync Utils tests', () => {
 			expect(
 				mockApp.internalPlugins.plugins.workspaces.instance.workspaces[spaceId]
 			).toBeDefined();
+		});
+
+		test('Should defer creation when the registry is empty but settings contain spaces', async () => {
+			const spaceId = 'context-workspaces';
+			const settings = {
+				spaces: {
+					[spaceId]: {
+						name: 'Context Space',
+						icon: '🚀',
+						autoSave: true,
+					},
+				},
+				spaceOrder: [spaceId],
+				currentSpaceId: spaceId,
+				workspaceLastSeen: { [spaceId]: Date.now() },
+			};
+
+			const result = await performBidirectionalSync(mockApp as unknown as App, settings);
+
+			expect(result.createdInObsidian).toHaveLength(0);
+			expect(result.errors[0]?.workspaceId).toBe('registry');
+			expect(
+				mockApp.internalPlugins.plugins.workspaces.instance.workspaces[spaceId]
+			).toBeUndefined();
 		});
 
 		test('Should handle name conflicts correctly', async () => {
@@ -187,6 +218,42 @@ describe('Sync Utils tests', () => {
 					get: () => originalWorkspaces,
 				}
 			);
+		});
+
+		test('Should not mutate settings when the registry read is unavailable', async () => {
+			const spaceId = 'context-workspaces';
+			const settings = {
+				spaces: {
+					[spaceId]: {
+						name: 'Context Space',
+						icon: '🚀',
+						autoSave: true,
+					},
+				},
+				spaceOrder: [spaceId],
+				currentSpaceId: spaceId,
+			};
+			const instance = mockApp.internalPlugins.plugins.workspaces.instance;
+			const originalWorkspaces = instance.workspaces;
+
+			Object.defineProperty(instance, 'workspaces', {
+				configurable: true,
+				get: () => {
+					throw new Error('Transient registry failure');
+				},
+			});
+
+			const result = await performBidirectionalSync(mockApp as unknown as App, settings);
+
+			expect(result.importedFromObsidian).toHaveLength(0);
+			expect(result.createdInObsidian).toHaveLength(0);
+			expect(result.errors[0]?.workspaceId).toBe('registry');
+			expect(settings.spaces[spaceId]).toBeDefined();
+
+			Object.defineProperty(instance, 'workspaces', {
+				configurable: true,
+				get: () => originalWorkspaces,
+			});
 		});
 	});
 });

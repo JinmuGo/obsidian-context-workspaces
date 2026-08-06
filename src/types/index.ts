@@ -85,6 +85,22 @@ export interface WorkspacesInstance {
 	_originalLoadWorkspace?: (id: string) => Promise<void>;
 }
 
+export type WorkspaceRegistrySnapshot =
+	| {
+			status: 'available';
+			names: Record<string, string>;
+	  }
+	| {
+			status: 'empty';
+			names: Record<string, string>;
+			error: string;
+	  }
+	| {
+			status: 'unavailable';
+			names: Record<string, string>;
+			error: string;
+	  };
+
 // Context Workspaces plugin-like interface
 export interface ContextWorkspacesPluginLike {
 	settings: { spaces: Record<string, unknown>; currentSpaceId: string };
@@ -107,7 +123,7 @@ export interface ContextWorkspacesSettings {
 	spaces: Record<string, SpaceConfig>;
 	spaceOrder: string[];
 	currentSpaceId: string;
-	workspaceLastSeen?: Record<string, number>; // Track when workspaces were last seen
+	workspaceLastSeen?: Record<string, number>; // Track workspaces observed in Obsidian (deletion/sync eligibility)
 	sidebarViewMode?: SidebarViewMode; // Sidebar display mode: 'icon' or 'list'
 	activateViewOnStartup?: boolean; // Reveal the Context Workspaces tab on startup
 	showStatusBar?: boolean; // Show the status bar space switcher
