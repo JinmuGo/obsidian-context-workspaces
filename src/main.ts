@@ -31,6 +31,7 @@ import {
 import { formatStatusBarLabel } from './utils/status-bar-utils';
 import { needsSync, safeBidirectionalSync } from './utils/sync-utils';
 import {
+	asContextWorkspacesView,
 	ContextWorkspacesView,
 	VIEW_TYPE_CONTEXT_WORKSPACES,
 } from './views/ContextWorkspacesView';
@@ -212,8 +213,11 @@ export default class ContextWorkspacesPlugin extends Plugin {
 	 */
 	getView(): ContextWorkspacesView | null {
 		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CONTEXT_WORKSPACES);
-		if (leaves.length > 0) {
-			return leaves[0].view as ContextWorkspacesView;
+		for (const leaf of leaves) {
+			const view = asContextWorkspacesView(leaf.view);
+			if (view) {
+				return view;
+			}
 		}
 		return null;
 	}

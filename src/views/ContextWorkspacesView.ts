@@ -1,10 +1,20 @@
-import { ItemView, type WorkspaceLeaf } from 'obsidian';
+import { ItemView, type View, type WorkspaceLeaf } from 'obsidian';
 import React from 'react';
 import { SidebarManager as ReactSidebarManager } from '../components/SidebarManager';
 import type { ContextWorkspacesPlugin } from '../types';
 import { ReactWrapper } from '../utils/react-utils';
 
 export const VIEW_TYPE_CONTEXT_WORKSPACES = 'context-workspaces-view';
+
+/**
+ * Returns the view only when the leaf holds a fully-constructed
+ * ContextWorkspacesView. Since Obsidian 1.7.2, background leaves expose a
+ * DeferredView placeholder instead of the real view; the placeholder has no
+ * render() method and must be treated as "no view".
+ */
+export function asContextWorkspacesView(view: View): ContextWorkspacesView | null {
+	return view instanceof ContextWorkspacesView ? view : null;
+}
 
 /**
  * Context Workspaces View - ItemView implementation

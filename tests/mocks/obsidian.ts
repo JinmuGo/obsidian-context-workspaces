@@ -64,6 +64,16 @@ function addObsidianMethods(element: HTMLElement): ObsidianElement {
 	return el;
 }
 
+export class ItemView {
+	leaf: unknown;
+	containerEl: ObsidianElement;
+
+	constructor(leaf: unknown) {
+		this.leaf = leaf;
+		this.containerEl = addObsidianMethods(document.createElement('div'));
+	}
+}
+
 export class Modal {
 	app: unknown;
 	contentEl: ObsidianElement;
