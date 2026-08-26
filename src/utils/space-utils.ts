@@ -4,19 +4,13 @@ import type { SpaceConfig, ThemeMode } from '../types';
  * Generate a unique space ID based on the name
  */
 export function generateSpaceId(name: string, existingSpaces: Record<string, SpaceConfig>): string {
-	if (!name || name.trim().length === 0) {
-		let spaceId = 'space';
-		let counter = 1;
-
-		while (existingSpaces[spaceId]) {
-			spaceId = `space-${counter}`;
-			counter++;
-		}
-
-		return spaceId;
-	}
-
-	const baseId = name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+	const baseId =
+		name
+			.normalize('NFKD')
+			.replace(/\p{M}+/gu, '')
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, '-')
+			.replace(/^-+|-+$/g, '') || 'space';
 	let spaceId = baseId;
 	let counter = 1;
 

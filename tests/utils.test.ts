@@ -23,6 +23,30 @@ describe('Space Utils tests', () => {
 			expect(id1).toBe('space');
 			expect(id2).toBe('space-1');
 		});
+
+		test('Should transliterate Latin diacritics and collapse separators', () => {
+			const spaces = {};
+
+			expect(generateSpaceId('Doppelte Übungen', spaces)).toBe('doppelte-ubungen');
+			expect(generateSpaceId('Crème brûlée', spaces)).toBe('creme-brulee');
+			expect(generateSpaceId('  déjà---vu  ', spaces)).toBe('deja-vu');
+		});
+
+		test('Should preserve uniqueness after diacritic normalization', () => {
+			const spaces = {
+				'doppelte-ubungen': {
+					name: 'Doppelte Ubungen',
+					icon: '📄',
+					autoSave: true,
+				},
+			};
+
+			expect(generateSpaceId('Doppelte Übungen', spaces)).toBe('doppelte-ubungen-1');
+		});
+
+		test('Should use the default ID when normalization leaves no ASCII characters', () => {
+			expect(generateSpaceId('🎯', {})).toBe('space');
+		});
 	});
 
 	describe('parseSpaceData', () => {
