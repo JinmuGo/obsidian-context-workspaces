@@ -14,6 +14,28 @@ describe('Sync Utils tests', () => {
 	});
 
 	describe('performBidirectionalSync', () => {
+		test('Should abstain when the Obsidian registry is empty', async () => {
+			const settings = {
+				spaces: {
+					workspace1: {
+						name: 'Workspace 1',
+						icon: '🚀',
+						autoSave: true,
+					},
+				},
+				spaceOrder: ['workspace1'],
+				currentSpaceId: 'workspace1',
+			};
+
+			const result = await performBidirectionalSync(mockApp as unknown as App, settings);
+
+			expect(result.errors).toEqual([
+				expect.objectContaining({ workspaceId: 'sync' }),
+			]);
+			expect(result.createdInObsidian).toEqual([]);
+			expect(mockApp.internalPlugins.plugins.workspaces.instance.saveData).not.toHaveBeenCalled();
+		});
+
 		test('Should import workspaces from Obsidian to Context Workspaces', async () => {
 			const workspaceId = 'obsidian-workspace';
 			const obsidianWorkspaceName = 'Obsidian Workspace';
@@ -44,6 +66,9 @@ describe('Sync Utils tests', () => {
 		test('Should create workspaces in Obsidian from Context Workspaces', async () => {
 			const spaceId = 'context-workspaces';
 			const spaceName = 'Context Space';
+			mockApp.internalPlugins.plugins.workspaces.instance.workspaces['existing-workspace'] = {
+				name: 'Existing Workspace',
+			};
 
 			// Context Workspaces settings
 			const settings = {

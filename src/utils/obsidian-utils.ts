@@ -177,7 +177,7 @@ export async function deleteObsidianWorkspace(app: App, workspaceId: string): Pr
 /**
  * Get workspace names from Obsidian's internal API
  */
-export function getObsidianWorkspaceNames(app: App): Record<string, string> {
+export function getObsidianWorkspaceNames(app: App): Record<string, string> | null {
 	try {
 		const workspaces = getWorkspacesPlugin(app);
 		if (workspaces?.enabled && workspaces.instance?.workspaces) {
@@ -187,10 +187,10 @@ export function getObsidianWorkspaceNames(app: App): Record<string, string> {
 			}
 			return workspaceNames;
 		}
-		return {};
+		return null;
 	} catch (error) {
 		console.error('Failed to get Obsidian workspace names:', error);
-		return {};
+		return null;
 	}
 }
 

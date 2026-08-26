@@ -1,7 +1,7 @@
 import { Menu, Notice, Plugin, type TFile } from 'obsidian';
 import type { ContextWorkspacesSettings, PendingSpaceRequest } from './types';
 import { DEFAULT_SETTINGS } from './types';
-import { needsDeletionDetection, safeDeletionDetection } from './utils/deletion-detection-utils';
+import { needsDeletionDetection } from './utils/deletion-detection-utils';
 import {
 	applySpaceTheme,
 	backupThemeState,
@@ -9,7 +9,6 @@ import {
 	deleteObsidianWorkspace,
 	getExistingWorkspaces,
 	getObsidianWorkspaceNames,
-	getWorkspacesPlugin,
 	isWorkspacesPluginEnabled,
 	loadWorkspaceState,
 	removeWorkspaceLoadMonitoring,
@@ -35,6 +34,14 @@ import {
 	SpaceManagerModal,
 } from './wrappers';
 
+const WORKSPACE_DELETION_CONFIRMATION_DELAY_MS = 5000;
+
+interface WorkspaceDeletionCandidate {
+	firstDetectedAt: number;
+	detections: number;
+	warned: boolean;
+}
+
 export default class ContextWorkspacesPlugin extends Plugin {
 	settings: ContextWorkspacesSettings;
 	layoutChangeTimeout: number;
@@ -46,6 +53,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 	internalWorkspaceLoadId: string | null = null;
 	workspaceLoadInProgress = 0;
 	workspaceLoadGeneration = 0;
+	private workspaceDeletionCandidates = new Map<string, WorkspaceDeletionCandidate>();
 	private pendingSpaceRequest: PendingSpaceRequest | null = null;
 	private statusBarItem: HTMLElement | null = null;
 
@@ -316,6 +324,7 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		const existingWorkspaces = getExistingWorkspaces(this.app);
 
 		if (Object.keys(this.settings.spaces).length === 0) {
+			const shouldCreateInitialWorkspace = Object.keys(existingWorkspaces).length === 0;
 			// Create initial space if no spaces exist
 			const initialSpaceId = 'space-1';
 			this.settings.spaces[initialSpaceId] = {
@@ -338,6 +347,18 @@ export default class ContextWorkspacesPlugin extends Plugin {
 			this.settings.spaceOrder = Object.keys(this.settings.spaces);
 			this.settings.currentSpaceId = initialSpaceId;
 			await this.saveSettings();
+
+			// First-run initialization is the only place where an empty registry is
+			// expected. Create the backing workspace explicitly so background sync
+			// can safely abstain from all later empty-registry snapshots.
+			if (shouldCreateInitialWorkspace) {
+				try {
+					await createObsidianWorkspace(this.app, initialSpaceId, 'My Space');
+				} catch (error) {
+					console.error('Failed to create the initial Obsidian workspace:', error);
+					new Notice('Initial space created, but its Obsidian workspace is unavailable.');
+				}
+			}
 		}
 	}
 
@@ -866,79 +887,71 @@ export default class ContextWorkspacesPlugin extends Plugin {
 	 */
 	handleWorkspaceChange(): void {
 		try {
-			// 1. Get Obsidian workspace list only once (prevent duplicate calls)
+			// Workspace switches temporarily change the registry and must never be
+			// interpreted as user-initiated deletion.
+			if (this.switchingToSpaceId) {
+				return;
+			}
+
 			const obsidianWorkspaceNames = getObsidianWorkspaceNames(this.app);
+			if (!obsidianWorkspaceNames || Object.keys(obsidianWorkspaceNames).length === 0) {
+				this.workspaceDeletionCandidates.clear();
+				return;
+			}
+
 			const deletedWorkspaces: string[] = [];
-			let currentWorkspaceDeleted = false;
+			const now = Date.now();
 
-			// 2. Detect deletions (synchronous processing) - with safety checks
 			for (const spaceId of Object.keys(this.settings.spaces)) {
+				if (spaceId === 'default') {
+					this.workspaceDeletionCandidates.delete(spaceId);
+					continue;
+				}
 
-				// Check if workspace exists in Obsidian
 				if (!obsidianWorkspaceNames[spaceId]) {
-					// Additional safety check: verify the workspace is actually deleted
-					// by checking if it's a recent deletion (within last 5 seconds)
-					const workspaceLastSeen = this.settings.workspaceLastSeen?.[spaceId];
-					const now = Date.now();
-					
-					// If we haven't seen this workspace recently, it might be a false positive
-					if (!workspaceLastSeen || (now - workspaceLastSeen) < 5000) {
-						// Double-check by trying to get the workspace again
-						try {
-							const workspaces = getWorkspacesPlugin(this.app);
-							if (workspaces?.instance?.workspaces?.[spaceId]) {
-								continue;
-							}
-						} catch (error) {
-							console.error(`Error checking workspace ${spaceId}:`, error);
-							continue; // Skip deletion if we can't verify
+					const previousCandidate = this.workspaceDeletionCandidates.get(spaceId);
+					const candidate: WorkspaceDeletionCandidate = previousCandidate
+						? { ...previousCandidate, detections: previousCandidate.detections + 1 }
+						: { firstDetectedAt: now, detections: 1, warned: false };
+					this.workspaceDeletionCandidates.set(spaceId, candidate);
+
+					const deletionConfirmed =
+						candidate.detections >= 2 &&
+						now - candidate.firstDetectedAt >= WORKSPACE_DELETION_CONFIRMATION_DELAY_MS;
+					if (!deletionConfirmed) {
+						continue;
+					}
+
+					// Keep the current Context Space as a recovery path even when the
+					// corresponding Obsidian workspace remains missing.
+					if (spaceId === this.settings.currentSpaceId) {
+						if (!candidate.warned) {
+							console.warn(
+								'Current workspace is missing from Obsidian. The Context Space was kept.'
+							);
+							new Notice(
+								'Current workspace is missing from Obsidian. The context space was not removed.',
+								5000
+							);
+							candidate.warned = true;
 						}
+						continue;
 					}
 
 					deletedWorkspaces.push(spaceId);
-
-					// Check if current workspace was deleted
-					if (spaceId === this.settings.currentSpaceId) {
-						currentWorkspaceDeleted = true;
-					}
 				} else {
-					// Update last seen timestamp for existing workspaces
+					this.workspaceDeletionCandidates.delete(spaceId);
 					if (!this.settings.workspaceLastSeen) {
 						this.settings.workspaceLastSeen = {};
 					}
-					this.settings.workspaceLastSeen[spaceId] = Date.now();
+					this.settings.workspaceLastSeen[spaceId] = now;
 				}
 			}
 
-			// 3. Handle deleted workspaces (with confirmation for current workspace)
 			if (deletedWorkspaces.length > 0) {
-				// Special handling for current workspace deletion
-				if (currentWorkspaceDeleted) {
-					console.warn('Current workspace appears to be deleted. This might be a false positive.');
-					
-					// Try to verify the deletion one more time
-					try {
-						const workspaces = getWorkspacesPlugin(this.app);
-						if (workspaces?.instance?.workspaces?.[this.settings.currentSpaceId]) {
-							return;
-						}
-					} catch (error) {
-						console.error('Error verifying current workspace deletion:', error);
-						return; // Don't proceed if we can't verify
-					}
-
-					// For current workspace deletion, show a more prominent warning
-					new Notice(
-						`Warning: current workspace appears to be deleted. Switching to default workspace.`,
-						5000
-					);
-				}
-
-				// For other workspace deletions, don't show notification to avoid spam
-
-				// Remove from Context Workspaces
 				for (const workspaceId of deletedWorkspaces) {
 					delete this.settings.spaces[workspaceId];
+					this.workspaceDeletionCandidates.delete(workspaceId);
 
 					const orderIndex = this.settings.spaceOrder.indexOf(workspaceId);
 					if (orderIndex !== -1) {
@@ -951,24 +964,12 @@ export default class ContextWorkspacesPlugin extends Plugin {
 					}
 				}
 
-				// Switch to default if current workspace was deleted
-				if (currentWorkspaceDeleted) {
-					this.settings.currentSpaceId = 'default';
-				}
-
-				// Save settings and update UI (asynchronous separation)
 				void (async () => {
 					try {
 						await this.saveSettings();
 						this.updateSidebarSpaces();
 
-						// Show notification only for significant changes
-						if (currentWorkspaceDeleted) {
-							new Notice(
-								'Current workspace was deleted, switched to default workspace.',
-								3000
-							);
-						} else if (deletedWorkspaces.length > 1) {
+						if (deletedWorkspaces.length > 1) {
 							new Notice(
 								`${deletedWorkspaces.length} workspaces were removed from Context Workspaces.`,
 								3000
@@ -980,7 +981,6 @@ export default class ContextWorkspacesPlugin extends Plugin {
 				})();
 			}
 
-			// 4. Detect new workspaces (synchronous processing)
 			const newWorkspaces: string[] = [];
 			for (const [workspaceId] of Object.entries(obsidianWorkspaceNames)) {
 				if (!this.settings.spaces[workspaceId] && workspaceId !== 'default') {
@@ -988,7 +988,6 @@ export default class ContextWorkspacesPlugin extends Plugin {
 				}
 			}
 
-			// 5. Handle new workspaces
 			if (newWorkspaces.length > 0) {
 				for (const workspaceId of newWorkspaces) {
 					const workspaceName = obsidianWorkspaceNames[workspaceId];
@@ -1037,9 +1036,10 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		// Sync missing workspaces on startup
 		await this.syncMissingWorkspacesFromObsidian();
 
-		// Check for workspace deletions on startup
+		// Record the first observation on startup. A later independent check is
+		// required before a non-current Context Space can be removed.
 		if (needsDeletionDetection(this.app, this.settings)) {
-			safeDeletionDetection(this.app, this.settings);
+			this.handleWorkspaceChange();
 		}
 
 		// Set up periodic sync (every 30 seconds) only if sync is needed
