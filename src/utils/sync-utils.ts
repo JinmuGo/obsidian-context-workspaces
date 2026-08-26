@@ -36,6 +36,20 @@ export async function performBidirectionalSync(
 
 	try {
 		const obsidianWorkspaceNames = getObsidianWorkspaceNames(app);
+		if (!obsidianWorkspaceNames) {
+			result.errors.push({
+				workspaceId: 'sync',
+				error: 'Obsidian workspace registry is unavailable',
+			});
+			return result;
+		}
+		if (Object.keys(obsidianWorkspaceNames).length === 0) {
+			result.errors.push({
+				workspaceId: 'sync',
+				error: 'Obsidian workspace registry is empty; synchronization was skipped',
+			});
+			return result;
+		}
 
 		for (const [workspaceId, workspaceName] of Object.entries(obsidianWorkspaceNames)) {
 			if (!settings.spaces[workspaceId]) {
@@ -125,6 +139,12 @@ export function notifySyncResult(result: SyncResult): void {
  */
 export function needsSync(app: App, settings: ContextWorkspacesSettings): boolean {
 	const obsidianWorkspaceNames = getObsidianWorkspaceNames(app);
+	if (!obsidianWorkspaceNames) {
+		return false;
+	}
+	if (Object.keys(obsidianWorkspaceNames).length === 0) {
+		return false;
+	}
 
 	// Check if there are workspaces only in Obsidian
 	for (const workspaceId of Object.keys(obsidianWorkspaceNames)) {
