@@ -5,8 +5,8 @@ import type { ContextWorkspacesPlugin, EmojiData, ThemeMode } from '../types';
 import {
 	applySpaceTheme,
 	getAvailableThemes,
-	getCurrentTheme,
 	getCurrentThemeModeForUI,
+	normalizeCommunityTheme,
 } from '../utils/obsidian-utils';
 import { EmojiPicker } from './EmojiPicker';
 
@@ -51,17 +51,8 @@ export const SpaceEditModal: React.FC<SpaceEditModalProps> = ({
 			setIcon(space?.icon || '📄');
 			setDescription(space?.description || '');
 			
-			// Handle theme initialization for "Use Obsidian theme" option
-			const currentObsidianTheme = getCurrentTheme(app as App);
-			const savedTheme = space?.theme;
-			
-			// If saved theme is the same as current Obsidian theme, show "Use Obsidian theme" option
-			if (savedTheme === currentObsidianTheme) {
-				setTheme('');
-			} else {
-				setTheme(savedTheme || '');
-			}
-			
+			setTheme(normalizeCommunityTheme(app as App, space?.theme) || '');
+
 			setThemeMode(space?.themeMode || 'system');
 			setAvailableThemes(getAvailableThemes(app as App));
 
@@ -101,15 +92,7 @@ export const SpaceEditModal: React.FC<SpaceEditModalProps> = ({
 			const isCurrentSpace = spaceId === plugin.settings.currentSpaceId;
 			const oldName = updatedSpace.name;
 
-			// Handle "Use Obsidian theme" option
-			let themeToSave: string | undefined;
-			if (theme === '' || !theme.trim()) {
-				// "Use Obsidian theme" selected - save current Obsidian theme
-				themeToSave = getCurrentTheme(app as App);
-			} else {
-				// Specific theme selected
-				themeToSave = theme.trim() || undefined;
-			}
+			const themeToSave = theme.trim() || undefined;
 
 			updatedSpace.name = trimmedName;
 			updatedSpace.icon = trimmedIcon;

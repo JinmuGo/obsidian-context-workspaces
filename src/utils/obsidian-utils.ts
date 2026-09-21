@@ -2,9 +2,18 @@ import type { App } from 'obsidian';
 import type {
 	ContextWorkspacesPluginLike,
 	ObsidianAppInternal,
+	ObsidianBaseTheme,
 	ThemeMode,
 	WorkspacesInstance,
 } from '../types';
+
+const THEME_MODE_TO_OBSIDIAN: Record<ThemeMode, ObsidianBaseTheme> = {
+	light: 'moonstone',
+	dark: 'obsidian',
+	system: 'system',
+};
+
+const LEGACY_BASE_THEME_VALUES = new Set(['dark', 'light', 'moonstone', 'obsidian', 'system']);
 
 /**
  * Cast App to internal API type for accessing undocumented Obsidian APIs
@@ -236,13 +245,28 @@ export function getAvailableThemes(app: App): string[] {
 			}
 		}
 
-		// Fallback to common themes
-		const commonThemes = ['obsidian', 'dark', 'light'];
-		return commonThemes;
+		return [];
 	} catch (error) {
 		console.error('Failed to get available themes:', error);
-		return ['obsidian', 'dark', 'light'];
+		return [];
 	}
+}
+
+/**
+ * Older versions stored Obsidian's base colour scheme in the community-theme field.
+ */
+export function normalizeCommunityTheme(app: App, theme?: string): string | undefined {
+	const selectedTheme = theme?.trim();
+	if (!selectedTheme) {
+		return undefined;
+	}
+
+	const availableThemes = getAvailableThemes(app);
+	if (LEGACY_BASE_THEME_VALUES.has(selectedTheme) && !availableThemes.includes(selectedTheme)) {
+		return undefined;
+	}
+
+	return selectedTheme;
 }
 
 /**
@@ -252,31 +276,22 @@ export function getCurrentTheme(app: App): string {
 	try {
 		const internal = asInternal(app);
 
-		// Method 1: Direct customCss access
+		// An empty value means the built-in Obsidian theme and is still a valid value.
 		const customCss = internal.customCss;
-		if (customCss?.theme) {
+		if (customCss && typeof customCss.theme === 'string') {
 			return customCss.theme;
 		}
 
-		// Method 2: Check vault config
+		// Community themes are stored separately from the base colour scheme.
 		const vaultConfig = internal.vault.config;
-		if (vaultConfig?.theme) {
-			return vaultConfig.theme;
+		if (vaultConfig && typeof vaultConfig.cssTheme === 'string') {
+			return vaultConfig.cssTheme;
 		}
 
-		// Method 3: Check body classes for default themes
-		const body = activeDocument.body;
-		if (body.classList.contains('theme-dark')) {
-			return 'dark';
-		}
-		if (body.classList.contains('theme-light')) {
-			return 'light';
-		}
-
-		return 'obsidian';
+		return '';
 	} catch (error) {
 		console.error('Failed to get current theme:', error);
-		return 'obsidian';
+		return '';
 	}
 }
 
@@ -294,19 +309,12 @@ export async function setTheme(app: App, themeName: string): Promise<void> {
 			return;
 		}
 
-		// Method 2: Use Obsidian's built-in theme switching if available
-		const themePlugin = internal.internalPlugins.plugins.theme;
-		if (themePlugin?.instance?.setTheme) {
-			themePlugin.instance.setTheme(themeName);
-			return;
-		}
-
-		// Method 3: Update vault config directly (with safety checks)
+		// Method 2: Update the community-theme config directly.
 		const vaultConfig = internal.vault.config;
 		if (vaultConfig) {
 			// Only change if the theme is actually different
-			if (vaultConfig.theme !== themeName) {
-				vaultConfig.theme = themeName;
+			if (vaultConfig.cssTheme !== themeName) {
+				vaultConfig.cssTheme = themeName;
 				if (internal.vault.saveConfig) {
 					await internal.vault.saveConfig();
 				}
@@ -330,7 +338,7 @@ export async function setTheme(app: App, themeName: string): Promise<void> {
 			return;
 		}
 
-		// Method 4: Fallback - try to reload the page theme
+		// Method 3: Fallback - try to reload the page theme
 		console.warn('Using fallback theme setting method');
 		throw new Error('Unable to set theme - no supported method available');
 	} catch (error) {
@@ -344,7 +352,18 @@ export async function setTheme(app: App, themeName: string): Promise<void> {
  */
 export function getCurrentThemeMode(app: App): ThemeMode {
 	try {
-		// Check body classes for current mode
+		const baseTheme = asInternal(app).vault.config?.theme;
+		if (baseTheme === 'system') {
+			return 'system';
+		}
+		if (baseTheme === 'obsidian') {
+			return 'dark';
+		}
+		if (baseTheme === 'moonstone') {
+			return 'light';
+		}
+
+		// Older or unavailable configs can still be resolved from the rendered state.
 		const body = activeDocument.body;
 		if (body.classList.contains('theme-dark')) {
 			return 'dark';
@@ -353,14 +372,6 @@ export function getCurrentThemeMode(app: App): ThemeMode {
 			return 'light';
 		}
 
-		// If no explicit classes, check if it's system mode
-		// Check config first
-		const configMode = asInternal(app).vault.config?.themeMode;
-		if (configMode === 'light' || configMode === 'dark') {
-			return configMode;
-		}
-
-		// If no explicit mode is set, it's system mode
 		return 'system';
 	} catch (error) {
 		console.error('Failed to get current theme mode:', error);
@@ -383,56 +394,42 @@ export function getCurrentThemeModeForUI(): 'light' | 'dark' {
 	return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
+function applyThemeModeToBody(mode: ThemeMode): boolean {
+	const resolvedMode = mode === 'system'
+		? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+		: mode;
+	const body = activeDocument.body;
+	const changed = !body.classList.contains(`theme-${resolvedMode}`);
+
+	body.classList.toggle('theme-dark', resolvedMode === 'dark');
+	body.classList.toggle('theme-light', resolvedMode === 'light');
+	return changed;
+}
+
 /**
  * Set theme mode
  */
 export async function setThemeMode(app: App, mode: ThemeMode): Promise<void> {
 	try {
-		const body = activeDocument.body;
-		const currentMode = getCurrentThemeMode(app);
-
-		// Only change if the mode is actually different
-		if (currentMode === mode) {
-			return;
-		}
-
 		const internal = asInternal(app);
+		const baseTheme = THEME_MODE_TO_OBSIDIAN[mode];
 
-		// Use Obsidian's built-in theme mode switching if available
-		const themePlugin = internal.internalPlugins.plugins.theme;
-		if (themePlugin?.instance?.setThemeMode) {
-			themePlugin.instance.setThemeMode(mode);
+		// Obsidian persists base colour schemes as system/moonstone/obsidian.
+		if (internal.changeTheme) {
+			internal.changeTheme(baseTheme);
 			return;
-		}
-
-		// Fallback: Manual class manipulation
-		if (mode === 'dark') {
-			body.classList.remove('theme-light');
-			body.classList.add('theme-dark');
-		} else if (mode === 'light') {
-			body.classList.remove('theme-dark');
-			body.classList.add('theme-light');
-		} else if (mode === 'system') {
-			// system mode - Remove both classes and apply system preference
-			body.classList.remove('theme-dark', 'theme-light');
-
-			// Apply system preference
-			const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-			if (isDarkMode) {
-				body.classList.add('theme-dark');
-			} else {
-				body.classList.add('theme-light');
-			}
 		}
 
 		// Update config for persistence
 		const vaultConfig = internal.vault.config;
 		if (vaultConfig) {
-			vaultConfig.themeMode = mode;
+			vaultConfig.theme = baseTheme;
 			if (internal.vault.saveConfig) {
 				await internal.vault.saveConfig();
 			}
 		}
+
+		applyThemeModeToBody(mode);
 
 		// Trigger theme change events
 		const workspace = internal.workspace;
@@ -469,18 +466,10 @@ export function applySpaceTheme(
 	try {
 		const changes: string[] = [];
 
-		// Apply theme if specified
-		if (theme !== undefined) {
-			let themeToApply: string;
-			
-			if (theme === '' || !theme.trim()) {
-				// "Use Obsidian theme" option selected - use original Obsidian theme
-				themeToApply = getOriginalObsidianTheme() || getCurrentTheme(app);
-			} else {
-				// Specific theme selected
-				themeToApply = theme.trim();
-			}
-			
+		// An omitted theme explicitly inherits the theme Obsidian had on plugin load.
+		const selectedTheme = normalizeCommunityTheme(app, theme);
+		const themeToApply = selectedTheme || getOriginalObsidianTheme();
+		if (themeToApply !== null) {
 			const currentTheme = getCurrentTheme(app);
 			if (currentTheme !== themeToApply) {
 				// Apply theme without changing Obsidian's default theme setting
@@ -489,14 +478,11 @@ export function applySpaceTheme(
 			}
 		}
 
-		// Apply mode if specified (including system mode)
+		// Apply mode if specified (including system mode). The persisted Obsidian
+		// preference is intentionally left untouched for workspace-specific modes.
 		if (themeMode) {
-			const currentMode = getCurrentThemeMode(app);
-			if (currentMode !== themeMode) {
-				// Apply theme mode without changing Obsidian's default theme mode setting
-				setThemeModeTemporarily(app, themeMode);
-				changes.push(`Mode: ${themeMode}`);
-			}
+			setThemeModeTemporarily(app, themeMode);
+			changes.push(`Mode: ${themeMode}`);
 		}
 	} catch (error) {
 		console.error('Failed to apply space theme:', error);
@@ -518,14 +504,7 @@ function setThemeTemporarily(app: App, themeName: string): void {
 			return;
 		}
 
-		// Method 2: Use Obsidian's built-in theme switching if available
-		const themePlugin = internal.internalPlugins.plugins.theme;
-		if (themePlugin?.instance?.setTheme) {
-			themePlugin.instance.setTheme(themeName);
-			return;
-		}
-
-		// Method 3: Apply theme without saving to config (temporary change)
+		// Method 2: Apply theme without saving to config (temporary change)
 		if (customCss) {
 			customCss.theme = themeName;
 
@@ -547,7 +526,7 @@ function setThemeTemporarily(app: App, themeName: string): void {
 			return;
 		}
 
-		// Method 4: Fallback
+		// Method 3: Fallback
 		console.warn('Using fallback temporary theme setting method');
 		throw new Error('Unable to set theme temporarily - no supported method available');
 	} catch (error) {
@@ -561,39 +540,10 @@ function setThemeTemporarily(app: App, themeName: string): void {
  */
 function setThemeModeTemporarily(app: App, mode: ThemeMode): void {
 	try {
-		const body = activeDocument.body;
-		const currentMode = getCurrentThemeMode(app);
-
-		// Only change if the mode is actually different
-		if (currentMode === mode) {
-			return;
-		}
-
 		const internal = asInternal(app);
-
-		// Use Obsidian's built-in theme mode switching if available
-		const themePlugin = internal.internalPlugins.plugins.theme;
-		if (themePlugin?.instance?.setThemeMode) {
-			themePlugin.instance.setThemeMode(mode);
+		const changed = applyThemeModeToBody(mode);
+		if (!changed) {
 			return;
-		}
-
-		// Fallback: Manual class manipulation without saving to config
-		if (mode === 'dark') {
-			body.classList.remove('theme-light');
-			body.classList.add('theme-dark');
-		} else if (mode === 'light') {
-			body.classList.remove('theme-dark');
-			body.classList.add('theme-light');
-		} else if (mode === 'system') {
-			body.classList.remove('theme-dark', 'theme-light');
-
-			const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-			if (isDarkMode) {
-				body.classList.add('theme-dark');
-			} else {
-				body.classList.add('theme-light');
-			}
 		}
 
 		// Trigger theme change events without saving config
@@ -766,14 +716,14 @@ export function backupThemeState(app: App): void {
  */
 export async function restoreThemeState(app: App): Promise<void> {
 	try {
-		if (!originalObsidianTheme && !originalObsidianThemeMode) {
+		if (originalObsidianTheme === null && originalObsidianThemeMode === null) {
 			return;
 		}
 
 		const changes: string[] = [];
 
 		// Restore to original Obsidian theme (not the backed up workspace-specific theme)
-		if (originalObsidianTheme) {
+		if (originalObsidianTheme !== null) {
 			const currentTheme = getCurrentTheme(app);
 			if (currentTheme !== originalObsidianTheme) {
 				await setTheme(app, originalObsidianTheme);
@@ -782,12 +732,9 @@ export async function restoreThemeState(app: App): Promise<void> {
 		}
 
 		// Restore to original Obsidian theme mode
-		if (originalObsidianThemeMode) {
-			const currentMode = getCurrentThemeMode(app);
-			if (currentMode !== originalObsidianThemeMode) {
-				await setThemeMode(app, originalObsidianThemeMode);
-				changes.push(`Mode: ${originalObsidianThemeMode}`);
-			}
+		if (originalObsidianThemeMode !== null) {
+			setThemeModeTemporarily(app, originalObsidianThemeMode);
+			changes.push(`Mode: ${originalObsidianThemeMode}`);
 		}
 	} catch (error) {
 		console.error('Failed to restore theme state:', error);

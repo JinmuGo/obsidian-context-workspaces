@@ -10,14 +10,6 @@ export interface ObsidianCustomCss {
 }
 
 /**
- * Obsidian's internal theme plugin instance interface
- */
-export interface ObsidianThemePluginInstance {
-	setTheme?: (themeName: string) => void;
-	setThemeMode?: (mode: string) => void;
-}
-
-/**
  * Obsidian's internal plugins interface
  */
 export interface ObsidianInternalPlugins {
@@ -25,9 +17,6 @@ export interface ObsidianInternalPlugins {
 		workspaces?: {
 			enabled?: boolean;
 			instance?: WorkspacesInstance;
-		};
-		theme?: {
-			instance?: ObsidianThemePluginInstance;
 		};
 	};
 }
@@ -38,13 +27,14 @@ export interface ObsidianInternalPlugins {
 export interface ObsidianAppInternal {
 	customCss?: ObsidianCustomCss;
 	internalPlugins: ObsidianInternalPlugins;
+	changeTheme?: (theme: ObsidianBaseTheme) => void;
 	workspace: {
 		trigger?: (event: string) => void;
 	};
 	vault: {
 		config?: {
-			theme?: string;
-			themeMode?: string;
+			theme?: ObsidianBaseTheme;
+			cssTheme?: string;
 			themes?: Record<string, unknown>;
 		};
 		saveConfig?: () => Promise<void>;
@@ -55,6 +45,9 @@ export interface ObsidianAppInternal {
 
 // Theme mode type
 export type ThemeMode = 'light' | 'dark' | 'system';
+
+// Obsidian's persisted base colour scheme values
+export type ObsidianBaseTheme = 'moonstone' | 'obsidian' | 'system';
 
 // Sidebar view mode type
 export type SidebarViewMode = 'icon' | 'list';
