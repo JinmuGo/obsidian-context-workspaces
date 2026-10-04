@@ -17,6 +17,8 @@ export interface ObsidianInternalPlugins {
 		workspaces?: {
 			enabled?: boolean;
 			instance?: WorkspacesInstance;
+			// Reads `.obsidian/workspaces.json` from disk
+			loadData?: () => Promise<WorkspacesData | null>;
 		};
 	};
 }
@@ -72,10 +74,28 @@ export interface ThemeStateBackup {
 // Obsidian workspace instance interface
 export interface WorkspacesInstance {
 	workspaces: Record<string, { name?: string } & Record<string, unknown>>;
+	activeWorkspace: string;
 	saveWorkspace: (id: string) => void;
 	loadWorkspace: (id: string) => Promise<void>;
+	deleteWorkspace: (id: string) => Promise<void>;
 	saveData: () => Promise<void>;
+	// Obsidian calls this when workspaces.json changes on disk (e.g. via a sync tool)
+	onExternalSettingsChange?: () => Promise<void>;
 	_originalLoadWorkspace?: (id: string) => Promise<void>;
+	_originalSaveWorkspace?: (id: string) => void;
+	_originalDeleteWorkspace?: (id: string) => Promise<void>;
+}
+
+// Persisted shape of `.obsidian/workspaces.json`
+export interface WorkspacesData {
+	workspaces?: WorkspacesInstance['workspaces'];
+	active?: string;
+}
+
+// Receives workspace registry changes that the user made through Obsidian's own UI
+export interface WorkspaceRegistryListener {
+	handleNativeWorkspaceSaved: (workspaceId: string) => void;
+	handleNativeWorkspaceDeleted: (workspaceId: string) => void;
 }
 
 // Queued space switch request (last-wins) while a switch is in flight.
@@ -124,7 +144,6 @@ export interface ContextWorkspacesSettings {
 	spaces: Record<string, SpaceConfig>;
 	spaceOrder: string[];
 	currentSpaceId: string;
-	workspaceLastSeen?: Record<string, number>; // Track when workspaces were last seen
 	sidebarViewMode?: SidebarViewMode; // Sidebar display mode: 'icon' or 'list'
 	activateViewOnStartup?: boolean; // Reveal the Context Workspaces tab on startup
 	showStatusBar?: boolean; // Show the status bar space switcher
@@ -164,5 +183,4 @@ export interface ContextWorkspacesPlugin {
 	// Workspace API synchronization methods
 	syncSpaceNameWithObsidian(spaceId: string, newName: string): Promise<void>;
 	syncMissingWorkspacesFromObsidian(): Promise<void>;
-	initializeWorkspaceSync(): Promise<void>;
 }

@@ -62,19 +62,15 @@ The main plugin class (`ContextWorkspacesPlugin` in `src/main.ts`) follows Obsid
 - `onload()`: Initialize sidebar, register events, add commands, setup workspace sync
 - `onunload()`: Save state, restore theme, cleanup resources
 
-### Bidirectional Workspace Synchronization
+### Workspace Synchronization
 
-The plugin maintains two-way sync between Context Workspaces and Obsidian's internal Workspace API:
+Spaces live in this plugin's `data.json`; layouts live in Obsidian's `workspaces.json`. Both files may be replaced by a sync tool (Syncthing, Obsidian Sync) at any time, so the plugin only acts on explicit events, never on the absence of a workspace:
 
-1. **Obsidian → Context Workspaces**: Import existing workspaces as spaces on initialization
-2. **Context Workspaces → Obsidian**: Create Obsidian workspaces when new spaces are created
-3. **Change Detection**: Monitor workspace changes via `workspace-changed` event (debounced to 1 second)
-4. **Deletion Detection**: Track workspace deletions using `workspaceLastSeen` timestamps with safety checks
-
-Key synchronization utilities in `src/utils/sync-utils.ts`:
-- `performBidirectionalSync()`: Handles two-way sync with conflict resolution
-- `safeBidirectionalSync()`: Wrapper with error handling
-- `needsSync()`: Determines if sync is needed
+1. **Obsidian → Context Workspaces**: Workspaces without a space are imported on load and when saved under a new name in Obsidian's UI (`importObsidianWorkspaces()` in `src/utils/sync-utils.ts`)
+2. **Context Workspaces → Obsidian**: Creating a space creates its workspace. A space whose workspace is missing gets one from the current layout only when the user switches to it on desktop
+3. **External file changes**: `onExternalSettingsChange()` reloads `data.json` (keeping this device's current space), and `setupWorkspaceRegistryMonitoring()` reloads `workspaces.json` into Obsidian's in-memory registry so the next save does not revert another device's changes
+4. **Deletion**: A space is removed only when the user deletes it in the plugin or deletes its workspace in Obsidian's UI. Deletions on other devices arrive through `data.json`
+5. **Mobile**: Read-only. Mobile loads layouts but never saves or creates them, so mobile tabs cannot overwrite shared desktop layouts
 
 ### State Management
 
@@ -82,7 +78,6 @@ Spaces are stored in plugin settings with the following structure:
 - `spaces`: Record of space configurations (name, icon, autoSave, theme, themeMode, description)
 - `spaceOrder`: Array defining display order for DnD support
 - `currentSpaceId`: Currently active space
-- `workspaceLastSeen`: Timestamps for deletion detection (prevents false positives)
 
 ### Auto-Save vs Snapshot Mode
 
@@ -111,9 +106,8 @@ UI components are in `src/components/`:
 
 `src/utils/` contains modular utility functions:
 - `obsidian-utils.ts`: Obsidian API interactions (workspace CRUD, theme management)
-- `sync-utils.ts`: Bidirectional synchronization logic
+- `sync-utils.ts`: One-way import of Obsidian workspaces as spaces
 - `space-utils.ts`: Space manipulation (search, ID generation, parsing)
-- `deletion-detection-utils.ts`: Workspace deletion detection with safety checks
 - `error-handling.ts`: Error handling utilities
 - `validation.ts`: Input validation
 - `performance-monitor.ts`: Performance tracking
@@ -123,12 +117,11 @@ UI components are in `src/components/`:
 
 Key event listeners:
 - `layout-change`: Auto-save current space (debounced 500ms)
-- `workspace-changed`: Detect workspace additions/deletions (debounced 1s)
 - `file-open`: Currently unused (auto-connection feature removed)
 
 ### Workspace Load Monitoring
 
-`setupWorkspaceLoadMonitoring()` in `obsidian-utils.ts` patches Obsidian's `loadWorkspace` method to auto-switch Context Spaces when workspaces are loaded via Obsidian's native interface.
+`setupWorkspaceLoadMonitoring()` in `obsidian-utils.ts` patches Obsidian's `loadWorkspace` method to auto-switch Context Spaces when workspaces are loaded via Obsidian's native interface. `setupWorkspaceRegistryMonitoring()` patches `saveWorkspace`/`deleteWorkspace` to report native workspace creation and deletion, and adds `onExternalSettingsChange` to the workspaces plugin.
 
 ## Type Safety
 
@@ -175,16 +168,11 @@ const workspaces = app.internalPlugins.plugins.workspaces;
 Many operations use setTimeout with delays to prevent race conditions:
 - Sidebar updates: 50ms delay
 - Layout changes: 500ms debounce
-- Workspace changes: 1000ms debounce
 
 ### Safe Error Handling
 
 Critical operations wrap theme/workspace changes with try-catch and restore original state on failure.
 
-### Deletion Detection Safety
+### Sync Safety
 
-Workspace deletions use multi-step verification:
-1. Check if workspace missing from Obsidian API
-2. Verify `workspaceLastSeen` timestamp (must be > 5 seconds old)
-3. Double-check by re-querying workspace
-4. Special handling for current workspace deletion
+A workspace missing from the registry usually means `workspaces.json` has not arrived from another device yet. Never delete a space or recreate its layout from the screen because of that absence (#18, #22).

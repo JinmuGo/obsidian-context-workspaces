@@ -1,21 +1,22 @@
-import { Menu, Notice, Plugin, type TFile } from 'obsidian';
+import { Menu, Notice, Platform, Plugin, type TFile } from 'obsidian';
 import type { ContextWorkspacesSettings, PendingSpaceRequest } from './types';
 import { DEFAULT_SETTINGS } from './types';
-import { needsDeletionDetection } from './utils/deletion-detection-utils';
 import {
 	applySpaceTheme,
 	backupThemeState,
 	createObsidianWorkspace,
 	deleteObsidianWorkspace,
 	getExistingWorkspaces,
-	getObsidianWorkspaceNames,
 	isWorkspacesPluginEnabled,
 	loadWorkspaceState,
 	removeWorkspaceLoadMonitoring,
+	removeWorkspaceRegistryMonitoring,
 	restoreThemeState,
 	saveWorkspaceState,
 	setupWorkspaceLoadMonitoring,
+	setupWorkspaceRegistryMonitoring,
 	updateObsidianWorkspaceName,
+	workspaceExistsInObsidian,
 } from './utils/obsidian-utils';
 import {
 	generateSpaceId,
@@ -23,7 +24,7 @@ import {
 	searchSpaces,
 } from './utils/space-utils';
 import { formatStatusBarLabel } from './utils/status-bar-utils';
-import { needsSync, safeBidirectionalSync } from './utils/sync-utils';
+import { importObsidianWorkspaces } from './utils/sync-utils';
 import {
 	ContextWorkspacesView,
 	VIEW_TYPE_CONTEXT_WORKSPACES,
@@ -34,18 +35,9 @@ import {
 	SpaceManagerModal,
 } from './wrappers';
 
-const WORKSPACE_DELETION_CONFIRMATION_DELAY_MS = 5000;
-
-interface WorkspaceDeletionCandidate {
-	firstDetectedAt: number;
-	detections: number;
-	warned: boolean;
-}
-
 export default class ContextWorkspacesPlugin extends Plugin {
 	settings: ContextWorkspacesSettings;
 	layoutChangeTimeout: number;
-	workspaceChangeTimeout: number;
 	switchingToSpaceId: string | null = null;
 	// The persisted current id may be stale after a plugin reload, so this is
 	// populated only after a workspace load has established what is visible.
@@ -53,7 +45,6 @@ export default class ContextWorkspacesPlugin extends Plugin {
 	internalWorkspaceLoadId: string | null = null;
 	workspaceLoadInProgress = 0;
 	workspaceLoadGeneration = 0;
-	private workspaceDeletionCandidates = new Map<string, WorkspaceDeletionCandidate>();
 	private pendingSpaceRequest: PendingSpaceRequest | null = null;
 	private statusBarItem: HTMLElement | null = null;
 
@@ -86,17 +77,6 @@ export default class ContextWorkspacesPlugin extends Plugin {
 			})
 		);
 
-		// Workspace changed event listener
-		this.registerEvent(
-			// @ts-expect-error - Event 'workspace-changed' is not in the public API types
-			this.app.workspace.on('workspace-changed', () => {
-				// Debounce workspace change events to prevent excessive calls
-				window.clearTimeout(this.workspaceChangeTimeout);
-				this.workspaceChangeTimeout = window.setTimeout(() => {
-					this.handleWorkspaceChange();
-				}, 1000); // Wait 1 second before processing workspace changes
-			})
-		);
 		// File open event listener (for auto-connection feature)
 		this.registerEvent(
 			this.app.workspace.on('file-open', (file: TFile) => {
@@ -146,11 +126,14 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		// Set up the status bar space switcher
 		this.setupStatusBar();
 
-		// Initialize workspace synchronization
-		await this.initializeWorkspaceSync();
+		// Import workspaces that were created while the plugin was not running
+		await this.syncMissingWorkspacesFromObsidian();
 
 		// Setup workspace load monitoring for auto-switching
 		setupWorkspaceLoadMonitoring(this.app, this);
+
+		// Follow workspaces.json changes from other devices and native workspace edits
+		setupWorkspaceRegistryMonitoring(this.app, this);
 
 		// Backup original Obsidian theme on plugin load
 		backupThemeState(this.app);
@@ -180,7 +163,6 @@ export default class ContextWorkspacesPlugin extends Plugin {
 
 		// Clear timeouts
 		window.clearTimeout(this.layoutChangeTimeout);
-		window.clearTimeout(this.workspaceChangeTimeout);
 		this.workspaceLoadGeneration += 1;
 		this.internalWorkspaceLoadId = null;
 		this.pendingSpaceRequest?.resolve(false);
@@ -189,8 +171,9 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		// Drop the status bar reference (Obsidian removes the element itself)
 		this.statusBarItem = null;
 
-		// Remove workspace load monitoring
+		// Remove workspace monitoring
 		removeWorkspaceLoadMonitoring(this.app);
+		removeWorkspaceRegistryMonitoring(this.app);
 	}
 
 	/**
@@ -303,11 +286,29 @@ export default class ContextWorkspacesPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign(
-			{},
-			DEFAULT_SETTINGS,
-			(await this.loadData()) as Partial<ContextWorkspacesSettings> | null,
-		);
+		// `workspaceLastSeen` drove the removed registry-based deletion detection.
+		const { workspaceLastSeen: _obsolete, ...data } = ((await this.loadData()) ?? {}) as Partial<
+			ContextWorkspacesSettings
+		> & { workspaceLastSeen?: unknown };
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
+	}
+
+	/**
+	 * Obsidian calls this when data.json changes on disk, e.g. through a sync tool.
+	 * The current space stays per device because it describes what this screen shows.
+	 */
+	async onExternalSettingsChange() {
+		const localCurrentSpaceId = this.settings.currentSpaceId;
+		await this.loadSettings();
+		if (this.settings.spaces[localCurrentSpaceId]) {
+			this.settings.currentSpaceId = localCurrentSpaceId;
+		}
+		// Another device deleted the space on screen; stop saving into it.
+		if (this.loadedWorkspaceId && !this.settings.spaces[this.loadedWorkspaceId]) {
+			this.cancelPendingLayoutSave();
+			this.loadedWorkspaceId = null;
+		}
+		this.updateSidebarSpaces();
 	}
 
 	async saveSettings() {
@@ -348,10 +349,9 @@ export default class ContextWorkspacesPlugin extends Plugin {
 			this.settings.currentSpaceId = initialSpaceId;
 			await this.saveSettings();
 
-			// First-run initialization is the only place where an empty registry is
-			// expected. Create the backing workspace explicitly so background sync
-			// can safely abstain from all later empty-registry snapshots.
-			if (shouldCreateInitialWorkspace) {
+			// Give the first space a backing workspace. Mobile layouts are never
+			// written to the shared registry; a desktop creates it on first switch.
+			if (shouldCreateInitialWorkspace && !Platform.isMobile) {
 				try {
 					await createObsidianWorkspace(this.app, initialSpaceId, 'My Space');
 				} catch (error) {
@@ -546,6 +546,19 @@ export default class ContextWorkspacesPlugin extends Plugin {
 		const space = this.settings.spaces[spaceId];
 		if (!space) return;
 
+		// The space exists but its layout does not, e.g. another device created it and
+		// its workspaces.json has not arrived yet. Keep the layout on screen and save it
+		// for the space, as creating a space does.
+		if (isWorkspacesPluginEnabled(this.app) && !workspaceExistsInObsidian(this.app, spaceId)) {
+			if (Platform.isMobile) {
+				new Notice(`${space.name} has no saved layout yet. Open it on desktop first.`);
+				throw new Error(`Obsidian workspace not found: ${spaceId}`);
+			}
+			await createObsidianWorkspace(this.app, spaceId, space.name);
+			new Notice(`${space.name} had no saved layout, so the current layout was saved to it.`);
+			return;
+		}
+
 		try {
 			// Load workspace state (this will automatically open pinned tabs)
 			this.internalWorkspaceLoadId = spaceId;
@@ -596,6 +609,13 @@ export default class ContextWorkspacesPlugin extends Plugin {
 	}
 
 	async createNewSpace() {
+		// A new space starts from the layout on screen, and mobile layouts must not
+		// end up in the workspaces that desktops share (#18).
+		if (Platform.isMobile) {
+			new Notice('Create new spaces on desktop. They sync to mobile with your vault.');
+			return;
+		}
+
 		const spaceData = await this.promptForSpaceName();
 		if (!spaceData) return;
 
@@ -748,7 +768,8 @@ export default class ContextWorkspacesPlugin extends Plugin {
 
 	private saveSpaceState(spaceId: string) {
 		const space = this.settings.spaces[spaceId];
-		if (!space?.autoSave) {
+		// Mobile only reads layouts; its tabs must not overwrite desktop workspaces (#18).
+		if (!space?.autoSave || Platform.isMobile) {
 			return;
 		}
 
@@ -832,224 +853,65 @@ export default class ContextWorkspacesPlugin extends Plugin {
 	}
 
 	/**
-	 * Perform bidirectional synchronization between Context Workspaces and Obsidian workspaces
+	 * Import Obsidian workspaces that have no Context Space yet
 	 */
 	async syncMissingWorkspacesFromObsidian(): Promise<void> {
-		try {
-			const syncResult = await safeBidirectionalSync(this.app, this.settings);
-
-			if (syncResult) {
-				// Save settings if there were changes
-				if (
-					syncResult.importedFromObsidian.length > 0 ||
-					syncResult.createdInObsidian.length > 0 ||
-					syncResult.conflicts.length > 0
-				) {
-					await this.saveSettings();
-					this.updateSidebarSpaces();
-				}
-
-				// Show notification with sync results
-				const messages: string[] = [];
-
-				if (syncResult.importedFromObsidian.length > 0) {
-					messages.push(
-						`Imported ${syncResult.importedFromObsidian.length} workspaces from Obsidian.`
-					);
-				}
-
-				if (syncResult.createdInObsidian.length > 0) {
-					messages.push(
-						`Created ${syncResult.createdInObsidian.length} workspaces in Obsidian.`
-					);
-				}
-
-				if (syncResult.conflicts.length > 0) {
-					messages.push(`Resolved ${syncResult.conflicts.length} name conflicts.`);
-				}
-
-				if (syncResult.errors.length > 0) {
-					messages.push(`${syncResult.errors.length} errors occurred.`);
-				}
-
-				if (messages.length > 0) {
-					new Notice(messages.join(' '));
-				}
-			}
-		} catch (error) {
-			console.error('Failed to perform bidirectional sync:', error);
-			new Notice('Error occurred during synchronization.');
+		const imported = importObsidianWorkspaces(this.app, this.settings);
+		if (imported.length === 0) {
+			return;
 		}
+
+		try {
+			await this.saveSettings();
+		} catch (error) {
+			console.error('Failed to save imported workspaces:', error);
+			return;
+		}
+		this.updateSidebarSpaces();
+		new Notice(`Imported ${imported.length} workspaces from Obsidian.`);
 	}
 
 	/**
-	 * Handle workspace changes (creation, deletion, modification) - optimized version
+	 * A workspace was saved through Obsidian's workspaces API. Saving under a new name
+	 * in Obsidian's own UI creates a workspace, so give it a space.
 	 */
-	handleWorkspaceChange(): void {
-		try {
-			// Workspace switches temporarily change the registry and must never be
-			// interpreted as user-initiated deletion.
-			if (this.switchingToSpaceId) {
-				return;
-			}
-
-			const obsidianWorkspaceNames = getObsidianWorkspaceNames(this.app);
-			if (!obsidianWorkspaceNames || Object.keys(obsidianWorkspaceNames).length === 0) {
-				this.workspaceDeletionCandidates.clear();
-				return;
-			}
-
-			const deletedWorkspaces: string[] = [];
-			const now = Date.now();
-
-			for (const spaceId of Object.keys(this.settings.spaces)) {
-				if (spaceId === 'default') {
-					this.workspaceDeletionCandidates.delete(spaceId);
-					continue;
-				}
-
-				if (!obsidianWorkspaceNames[spaceId]) {
-					const previousCandidate = this.workspaceDeletionCandidates.get(spaceId);
-					const candidate: WorkspaceDeletionCandidate = previousCandidate
-						? { ...previousCandidate, detections: previousCandidate.detections + 1 }
-						: { firstDetectedAt: now, detections: 1, warned: false };
-					this.workspaceDeletionCandidates.set(spaceId, candidate);
-
-					const deletionConfirmed =
-						candidate.detections >= 2 &&
-						now - candidate.firstDetectedAt >= WORKSPACE_DELETION_CONFIRMATION_DELAY_MS;
-					if (!deletionConfirmed) {
-						continue;
-					}
-
-					// Keep the current Context Space as a recovery path even when the
-					// corresponding Obsidian workspace remains missing.
-					if (spaceId === this.settings.currentSpaceId) {
-						if (!candidate.warned) {
-							console.warn(
-								'Current workspace is missing from Obsidian. The Context Space was kept.'
-							);
-							new Notice(
-								'Current workspace is missing from Obsidian. The context space was not removed.',
-								5000
-							);
-							candidate.warned = true;
-						}
-						continue;
-					}
-
-					deletedWorkspaces.push(spaceId);
-				} else {
-					this.workspaceDeletionCandidates.delete(spaceId);
-					if (!this.settings.workspaceLastSeen) {
-						this.settings.workspaceLastSeen = {};
-					}
-					this.settings.workspaceLastSeen[spaceId] = now;
-				}
-			}
-
-			if (deletedWorkspaces.length > 0) {
-				for (const workspaceId of deletedWorkspaces) {
-					delete this.settings.spaces[workspaceId];
-					this.workspaceDeletionCandidates.delete(workspaceId);
-
-					const orderIndex = this.settings.spaceOrder.indexOf(workspaceId);
-					if (orderIndex !== -1) {
-						this.settings.spaceOrder.splice(orderIndex, 1);
-					}
-
-					// Clean up last seen timestamp
-					if (this.settings.workspaceLastSeen?.[workspaceId]) {
-						delete this.settings.workspaceLastSeen[workspaceId];
-					}
-				}
-
-				void (async () => {
-					try {
-						await this.saveSettings();
-						this.updateSidebarSpaces();
-
-						if (deletedWorkspaces.length > 1) {
-							new Notice(
-								`${deletedWorkspaces.length} workspaces were removed from Context Workspaces.`,
-								3000
-							);
-						}
-					} catch (error) {
-						console.error('Failed to handle deleted workspaces:', error);
-					}
-				})();
-			}
-
-			const newWorkspaces: string[] = [];
-			for (const [workspaceId] of Object.entries(obsidianWorkspaceNames)) {
-				if (!this.settings.spaces[workspaceId] && workspaceId !== 'default') {
-					newWorkspaces.push(workspaceId);
-				}
-			}
-
-			if (newWorkspaces.length > 0) {
-				for (const workspaceId of newWorkspaces) {
-					const workspaceName = obsidianWorkspaceNames[workspaceId];
-					this.settings.spaces[workspaceId] = {
-						name: workspaceName || workspaceId,
-						icon: '📄',
-						autoSave: false,
-					};
-
-					// Add to space order if not already present
-					if (!this.settings.spaceOrder.includes(workspaceId)) {
-						this.settings.spaceOrder.push(workspaceId);
-					}
-
-					// Update last seen timestamp
-					if (!this.settings.workspaceLastSeen) {
-						this.settings.workspaceLastSeen = {};
-					}
-					this.settings.workspaceLastSeen[workspaceId] = Date.now();
-				}
-
-				// Save settings and update UI
-				void (async () => {
-					try {
-						await this.saveSettings();
-						this.updateSidebarSpaces();
-
-						// Show notification
-						new Notice(
-							`${newWorkspaces.length} new workspaces were imported from Obsidian.`
-						);
-					} catch (error) {
-						console.error('Failed to handle new workspaces:', error);
-					}
-				})();
-			}
-		} catch (error) {
-			console.error('Failed to handle workspace change:', error);
+	handleNativeWorkspaceSaved(workspaceId: string): void {
+		if (this.settings.spaces[workspaceId]) {
+			return;
 		}
+		void this.syncMissingWorkspacesFromObsidian();
 	}
 
 	/**
-	 * Initialize workspace synchronization
+	 * The user deleted a workspace in Obsidian's own UI. Deletions on other devices
+	 * arrive through data.json instead; a workspace that is merely missing from the
+	 * registry never removes a space, because a sync tool may not have delivered it yet (#22).
 	 */
-	async initializeWorkspaceSync(): Promise<void> {
-		// Sync missing workspaces on startup
-		await this.syncMissingWorkspacesFromObsidian();
-
-		// Record the first observation on startup. A later independent check is
-		// required before a non-current Context Space can be removed.
-		if (needsDeletionDetection(this.app, this.settings)) {
-			this.handleWorkspaceChange();
+	handleNativeWorkspaceDeleted(workspaceId: string): void {
+		if (!this.settings.spaces[workspaceId]) {
+			return;
 		}
 
-		// Set up periodic sync (every 30 seconds) only if sync is needed
-		window.setInterval(() => {
-			if (
-				needsSync(this.app, this.settings) ||
-				needsDeletionDetection(this.app, this.settings)
-			) {
-				this.handleWorkspaceChange();
-			}
-		}, 30000);
+		// At least one space must exist. Its layout is recreated on the next switch.
+		const remainingSpaceIds = this.settings.spaceOrder.filter((id) => id !== workspaceId);
+		if (remainingSpaceIds.length === 0) {
+			return;
+		}
+
+		delete this.settings.spaces[workspaceId];
+		this.settings.spaceOrder = remainingSpaceIds;
+		if (this.settings.currentSpaceId === workspaceId) {
+			this.settings.currentSpaceId = remainingSpaceIds[0];
+		}
+		// The deleted layout may still be on screen; never save it back.
+		if (this.loadedWorkspaceId === workspaceId) {
+			this.cancelPendingLayoutSave();
+			this.loadedWorkspaceId = null;
+		}
+
+		void this.saveSettings().then(
+			() => this.updateSidebarSpaces(),
+			(error) => console.error('Failed to remove the deleted workspace space:', error)
+		);
 	}
 }

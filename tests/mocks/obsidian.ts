@@ -10,6 +10,10 @@ interface CreateElementOptions {
 
 type ObsidianElement = HTMLElement & Record<string, unknown>;
 
+export const Platform = {
+	isMobile: false,
+};
+
 export class Notice {
 	// Notice functionality for testing
 }
