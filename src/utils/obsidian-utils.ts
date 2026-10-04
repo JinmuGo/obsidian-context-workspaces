@@ -3,8 +3,10 @@ import type {
 	ContextWorkspacesPluginLike,
 	ObsidianAppInternal,
 	ObsidianBaseTheme,
+	ObsidianInternalPlugins,
 	ThemeMode,
-	WorkspacesInstance,
+	WorkspaceRegistryListener,
+	WorkspacesData,
 } from '../types';
 
 const THEME_MODE_TO_OBSIDIAN: Record<ThemeMode, ObsidianBaseTheme> = {
@@ -25,10 +27,7 @@ function asInternal(app: App): ObsidianAppInternal {
 /**
  * Get Obsidian's internal workspaces plugin
  */
-export function getWorkspacesPlugin(app: App): {
-	enabled?: boolean;
-	instance?: WorkspacesInstance;
-} | undefined {
+export function getWorkspacesPlugin(app: App): ObsidianInternalPlugins['plugins']['workspaces'] {
 	return asInternal(app).internalPlugins.plugins.workspaces;
 }
 
@@ -85,7 +84,7 @@ export function getExistingWorkspaces(app: App): Record<string, unknown> {
 }
 
 /**
- * Create workspace in Obsidian's internal API
+ * Create a workspace in Obsidian's internal API from the layout currently on screen
  */
 export async function createObsidianWorkspace(
 	app: App,
@@ -95,50 +94,10 @@ export async function createObsidianWorkspace(
 	try {
 		const workspaces = getWorkspacesPlugin(app);
 		if (workspaces?.enabled && workspaces.instance) {
-			// 현재 workspace의 상태를 저장하여 가져오기
-			const tempWorkspaceId = `temp_${Date.now()}`;
-
-			// 현재 상태를 임시 workspace로 저장
-			workspaces.instance.saveWorkspace(tempWorkspaceId);
-
-			// 저장된 현재 상태를 가져와서 복사
-			const currentWorkspace = workspaces.instance.workspaces[tempWorkspaceId];
-			let workspaceStructure: Record<string, unknown> & { name: string };
-
-			if (currentWorkspace && typeof currentWorkspace === 'object') {
-				// 현재 workspace의 구조를 복사하되, name만 변경
-				workspaceStructure = {
-					...currentWorkspace,
-					name: workspaceName,
-				} as Record<string, unknown> & { name: string };
-
-				// 임시 workspace 삭제
-				delete workspaces.instance.workspaces[tempWorkspaceId];
-			} else {
-				// 현재 workspace가 없는 경우 기본 구조 사용
-				workspaceStructure = {
-					name: workspaceName,
-					main: {
-						type: 'tabs',
-						active: null,
-						children: [],
-					},
-					left: {
-						type: 'tabs',
-						active: null,
-						children: [],
-					},
-					right: {
-						type: 'tabs',
-						active: null,
-						children: [],
-					},
-				};
-			}
-
-			workspaces.instance.workspaces[workspaceId] = workspaceStructure;
-
-			// Workspace 저장
+			workspaces.instance.workspaces[workspaceId] = {
+				...app.workspace.getLayout(),
+				name: workspaceName,
+			};
 			await workspaces.instance.saveData();
 		}
 	} catch (error) {
@@ -685,6 +644,92 @@ export function removeWorkspaceLoadMonitoring(app: App): void {
 		}
 	} catch (error) {
 		console.error('Failed to remove workspace load monitoring:', error);
+	}
+}
+
+/**
+ * Keep Obsidian's in-memory workspace registry in step with `workspaces.json` on disk
+ * and report registry changes the user makes through Obsidian's own workspace UI.
+ *
+ * Obsidian's workspaces plugin reads `workspaces.json` only when it is enabled and
+ * rewrites the whole file from memory on every save. When a sync tool such as
+ * Syncthing replaces the file, the next save on this device would silently revert the
+ * other device's changes. Obsidian calls `onExternalSettingsChange` on internal
+ * plugins when their config file changes on disk with a newer mtime than their last
+ * write, so the plugin reloads its registry from there.
+ */
+export function setupWorkspaceRegistryMonitoring(
+	app: App,
+	listener: WorkspaceRegistryListener
+): void {
+	try {
+		const workspaces = getWorkspacesPlugin(app);
+		const instance = workspaces?.instance;
+		if (!workspaces?.enabled || !instance) {
+			return;
+		}
+
+		// Keep the unbound methods so unload restores exactly what Obsidian installed.
+		const originalSaveWorkspace = instance.saveWorkspace;
+		const originalDeleteWorkspace = instance.deleteWorkspace;
+		instance._originalSaveWorkspace = originalSaveWorkspace;
+		instance._originalDeleteWorkspace = originalDeleteWorkspace;
+
+		instance.saveWorkspace = (workspaceId: string) => {
+			originalSaveWorkspace.call(instance, workspaceId);
+			listener.handleNativeWorkspaceSaved(workspaceId);
+		};
+
+		instance.deleteWorkspace = async (workspaceId: string) => {
+			await originalDeleteWorkspace.call(instance, workspaceId);
+			listener.handleNativeWorkspaceDeleted(workspaceId);
+		};
+
+		const loadData = workspaces.loadData?.bind(workspaces) as
+			| (() => Promise<WorkspacesData | null>)
+			| undefined;
+		if (loadData) {
+			instance.onExternalSettingsChange = async () => {
+				try {
+					const data = await loadData();
+					// A missing or unreadable file is not evidence that the
+					// workspaces were removed; keep the registry in memory.
+					if (!data) {
+						return;
+					}
+					instance.workspaces = data.workspaces ?? {};
+					instance.activeWorkspace = data.active ?? '';
+				} catch (error) {
+					console.error('Failed to reload the Obsidian workspace registry:', error);
+				}
+			};
+		}
+	} catch (error) {
+		console.error('Failed to setup workspace registry monitoring:', error);
+	}
+}
+
+/**
+ * Remove workspace registry monitoring
+ */
+export function removeWorkspaceRegistryMonitoring(app: App): void {
+	try {
+		const instance = getWorkspacesPlugin(app)?.instance;
+		if (!instance) {
+			return;
+		}
+
+		if (instance._originalSaveWorkspace) {
+			instance.saveWorkspace = instance._originalSaveWorkspace;
+			delete instance._originalSaveWorkspace;
+		}
+		if (instance._originalDeleteWorkspace) {
+			instance.deleteWorkspace = instance._originalDeleteWorkspace;
+			delete instance._originalDeleteWorkspace;
+		}
+		delete instance.onExternalSettingsChange;
+	} catch (error) {
+		console.error('Failed to remove workspace registry monitoring:', error);
 	}
 }
 

@@ -35,7 +35,7 @@ https://github.com/user-attachments/assets/3e9b9ffa-e861-431d-88f4-cbb306b79c4f
 
 ### Obsidian Workspace API Integration
 
-- **Bidirectional Sync**: Automatic synchronization with Obsidian's built-in Workspace API
+- **Workspace Sync**: Spaces follow workspaces you create, save, or delete in Obsidian's own workspace UI
 - **Import Existing Workspaces**: Automatically imports existing Obsidian workspaces as spaces
 - **Auto-switch on Workspace Load**: Automatically switch to corresponding Context Space when using Obsidian's `loadWorkspace` API
 
@@ -77,6 +77,15 @@ pnpm build
 - Toggle auto-save mode for each space in **Settings > Context Workspaces**
 - **Auto-save ON**: Automatically saves and restores current state when switching spaces
 - **Auto-save OFF**: Default Workspace behavior (manual save/load)
+
+### Syncing Across Devices
+
+Context Workspaces works with file sync tools such as Syncthing and Obsidian Sync. Sync both `.obsidian/workspaces.json` and `.obsidian/plugins/context-workspaces/data.json` to every device. Do not sync `.obsidian/workspace.json` or `.obsidian/workspace-mobile.json`, because they hold each device's open tabs.
+
+- Changes to spaces and layouts from another device are picked up without restarting Obsidian
+- A space is removed only when you delete it, never because its layout has not synced yet
+- If you switch to a space whose layout has not arrived on a desktop, the current layout is saved to it
+- Mobile is read-only: it loads layouts but never saves them, and new spaces are created on desktop
 
 ### Theme Settings
 
