@@ -38,6 +38,7 @@ pnpm check:fix        # Run all checks with auto-fix
 pnpm test             # Run all tests
 pnpm test:watch       # Run tests in watch mode
 pnpm test:coverage    # Run tests with coverage report
+pnpm test:e2e         # Run issue scenarios in a real Obsidian (macOS)
 ```
 
 ## Development Setup
@@ -151,6 +152,22 @@ Git hooks (lefthook):
 - JSDOM environment for React component testing
 - Obsidian API mocked in `tests/mocks/obsidian.ts`
 - Test files: `tests/*.test.ts`
+
+### End-to-End Issue Scenarios
+
+`e2e/` runs one scenario per reported issue against the installed Obsidian app. Each scenario starts a separate Obsidian instance with its own `--user-data-dir` and a temporary vault, so the user's Obsidian profile and vaults are never touched. The newest app package (`obsidian-*.asar`) is copied from `~/Library/Application Support/obsidian` so the test uses the user's Obsidian version.
+
+```bash
+pnpm test:e2e                                   # all scenarios, working tree build
+pnpm test:e2e issue-22                          # one scenario
+pnpm test:e2e issue-22 --ref origin/main        # build a git ref, e.g. to reproduce the bug
+pnpm test:e2e --keep                            # keep temporary vaults for inspection
+```
+
+- Scenarios live in `e2e/scenarios/issue-<number>.mjs` and export `{ id, title, vault, run(ctx) }`
+- `ctx` drives Obsidian over the Chrome DevTools Protocol: `eval`, `switchToSpace`, `openPluginSettings`, `deliver` (write a file the way a sync tool does), `emulateMobile`, `check`
+- A scenario fails on the buggy build and passes on the fix. Run it with `--ref` against both before opening a PR
+- Set `OBSIDIAN_BIN` to use another Obsidian binary
 
 ## Common Patterns
 
