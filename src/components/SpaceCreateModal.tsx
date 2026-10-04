@@ -2,7 +2,7 @@ import { type App, Modal, Notice } from 'obsidian';
 import * as React from 'react';
 import { createRoot } from 'react-dom/client';
 import type { EmojiData, ThemeMode } from '../types';
-import { getAvailableThemes, getCurrentTheme, getCurrentThemeModeForUI } from '../utils/obsidian-utils';
+import { getAvailableThemes, getCurrentThemeModeForUI } from '../utils/obsidian-utils';
 import { EmojiPicker } from './EmojiPicker';
 
 interface SpaceCreateModalProps {
@@ -188,15 +188,7 @@ export class SpaceCreateModal extends Modal {
 		const trimmedIcon = this.icon.trim();
 
 		if (trimmedName && trimmedIcon) {
-			// Handle "Use Obsidian theme" option
-			let themeToSave: string | undefined;
-			if (this.theme === '' || !this.theme.trim()) {
-				// "Use Obsidian theme" selected - save current Obsidian theme
-				themeToSave = getCurrentTheme(this.app);
-			} else {
-				// Specific theme selected
-				themeToSave = this.theme.trim() || undefined;
-			}
+			const themeToSave = this.theme.trim() || undefined;
 
 			const submitData = {
 				name: trimmedName,
